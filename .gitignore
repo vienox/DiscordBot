@@ -87,6 +87,7 @@ logs/
 downloads/
 temp/
 cache/
+cookies.txt
 
 # FFmpeg
 ffmpeg-*.zip

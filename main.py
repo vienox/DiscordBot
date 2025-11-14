@@ -12,6 +12,16 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
+# Przygotuj cookies dla yt-dlp
+COOKIES_FILE = 'cookies.txt'
+if os.getenv('YOUTUBE_COOKIES'):
+    # Na hostingu - zapisz cookies ze zmiennej środowiskowej
+    with open(COOKIES_FILE, 'w') as f:
+        f.write(os.getenv('YOUTUBE_COOKIES'))
+elif not os.path.exists(COOKIES_FILE):
+    # Lokalnie - użyj cookies z pliku (jeśli istnieje)
+    print("⚠️ Ostrzeżenie: Brak pliku cookies.txt - YouTube może nie działać")
+
 # Znajdź FFmpeg
 def find_ffmpeg():
     if shutil.which('ffmpeg'):
@@ -56,6 +66,7 @@ YDL_OPTIONS = {
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
     'ignoreerrors': True,
+    'cookiefile': 'cookies.txt',  # Plik cookies z YouTube
     'postprocessors': [{  # Konwersja do najlepszej jakości
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'opus',
