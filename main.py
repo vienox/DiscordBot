@@ -5,25 +5,23 @@ import yt_dlp
 import asyncio
 import os
 import shutil
+import re
+import aiohttp
 from dotenv import load_dotenv
 
-# Załaduj token z pliku .env
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # Znajdź FFmpeg
 def find_ffmpeg():
-    # Sprawdź czy ffmpeg jest w PATH
     if shutil.which('ffmpeg'):
         return 'ffmpeg'
     
-    # Sprawdź typowe lokalizacje
     possible_paths = [
         r'C:\ffmpeg\bin\ffmpeg.exe',
         r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
     ]
     
-    # Szukaj folderów ffmpeg-* w C:\
     try:
         import glob
         ffmpeg_dirs = glob.glob(r'C:\ffmpeg-*')
@@ -50,17 +48,24 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Opcje dla yt-dlp
 YDL_OPTIONS = {
-    'format': 'bestaudio/best',
-    'noplaylist': False,
+    'format': 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',  # Najlepsza jakość audio
+    'noplaylist': False,  # Zezwól na playlisty
+    'extract_flat': 'in_playlist',  # Szybkie pobieranie playlist
     'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
+    'ignoreerrors': True,
+    'postprocessors': [{  # Konwersja do najlepszej jakości
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'opus',
+        'preferredquality': '320',
+    }],
 }
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
+    'options': '-vn -b:a 320k -ar 48000 -ac 2'  # 320kbps bitrate, 48kHz sample rate, stereo
 }
 
 # Kolejka muzyki dla każdego serwera
@@ -92,6 +97,25 @@ def get_queue(guild_id):
         music_queues[guild_id] = MusicQueue()
     return music_queues[guild_id]
 
+async def get_spotify_track_info(track_id):
+    """Pobierz informacje o utworze ze Spotify (bez autoryzacji)"""
+    url = f"https://open.spotify.com/oembed?url=spotify:track:{track_id}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                # Format: "Artist - Title"
+                title_parts = data.get('title', '').split(' · ')
+                if len(title_parts) >= 2:
+                    return f"{title_parts[1]} {title_parts[0]}"  # Artist Title
+                return data.get('title', '')
+    return None
+
+async def get_spotify_playlist_info(playlist_id):
+    """Pobierz informacje o playliście (wymaga web scraping - uproszczona wersja)"""
+    # Dla playlist używamy tylko pierwszego utworu lub informujemy użytkownika
+    return None
+
 async def play_next(guild):
     queue = get_queue(guild.id)
     voice_client = discord.utils.get(bot.voice_clients, guild=guild)
@@ -110,7 +134,7 @@ async def play_next(guild):
                 )
             )
         else:
-            await asyncio.sleep(180)  # Czekaj 3 minuty
+            await asyncio.sleep(180)  
             if voice_client and not voice_client.is_playing():
                 await voice_client.disconnect()
 
@@ -122,6 +146,64 @@ async def on_ready():
         print(f'Zsynchronizowano {len(synced)} komend')
     except Exception as e:
         print(f'Błąd synchronizacji: {e}')
+
+@bot.tree.command(name="help", description="Pokaż listę wszystkich komend")
+async def help_command(interaction: discord.Interaction):
+    try:
+        embed = discord.Embed(
+            title="🎵 Pomoc - Komendy Muzycznego Bota",
+            description="Oto lista wszystkich dostępnych komend:",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="▶️ Podstawowe",
+            value=(
+                "`/join` - Bot dołącza do kanału głosowego\n"
+                "`/leave` - Bot opuszcza kanał głosowy\n"
+                "`/help` - Pokaż tę wiadomość"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎵 Odtwarzanie",
+            value=(
+                "`/play <zapytanie>` - Odtwórz utwór z YouTube/Spotify\n"
+                "`/pause` - Zatrzymaj odtwarzanie\n"
+                "`/resume` - Wznów odtwarzanie\n"
+                "`/skip` - Pomiń obecny utwór\n"
+                "`/stop` - Zatrzymaj i wyczyść kolejkę"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📋 Kolejka",
+            value=(
+                "`/queue` - Pokaż kolejkę utworów\n"
+                "`/clear` - Wyczyść kolejkę\n"
+                "`/loop` - Włącz/wyłącz zapętlanie utworu"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💡 Przykłady użycia",
+            value=(
+                "`/play never gonna give you up`\n"
+                "`/play https://www.youtube.com/watch?v=...`\n"
+                "`/play https://www.youtube.com/playlist?list=...`\n"
+                "`/play https://open.spotify.com/track/...`"
+            ),
+            inline=False
+        )
+        
+        embed.set_footer(text="Bot stworzony z ❤️ | Obsługuje YouTube i Spotify")
+        
+        await interaction.response.send_message(embed=embed)
+    except discord.errors.NotFound:
+        pass
 
 @bot.tree.command(name="join", description="Bot dołącza do Twojego kanału głosowego")
 async def join(interaction: discord.Interaction):
@@ -148,8 +230,8 @@ async def leave(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ Bot nie jest na żadnym kanale!", ephemeral=True)
 
-@bot.tree.command(name="play", description="Odtwórz utwór z YouTube")
-@app_commands.describe(zapytanie="Nazwa utworu lub link YouTube")
+@bot.tree.command(name="play", description="Odtwórz utwór z YouTube lub Spotify")
+@app_commands.describe(zapytanie="Nazwa utworu, link YouTube lub Spotify")
 async def play(interaction: discord.Interaction, zapytanie: str):
     await interaction.response.defer()
     
@@ -164,39 +246,104 @@ async def play(interaction: discord.Interaction, zapytanie: str):
     queue = get_queue(interaction.guild.id)
     
     try:
-        # Uruchom yt-dlp w osobnym wątku, aby nie blokować bota
+        # Sprawdź czy to link Spotify
+        spotify_track_pattern = r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)'
+        spotify_playlist_pattern = r'https?://open\.spotify\.com/playlist/([a-zA-Z0-9]+)'
+        
+        track_match = re.search(spotify_track_pattern, zapytanie)
+        playlist_match = re.search(spotify_playlist_pattern, zapytanie)
+        
+        search_queries = []
+        
+        if track_match:
+            # Pobierz informacje o utworze ze Spotify
+            track_id = track_match.group(1)
+            track_name = await get_spotify_track_info(track_id)
+            if track_name:
+                search_queries.append(track_name)
+                await interaction.followup.send(f"🎵 Szukam ze Spotify: **{track_name}**")
+            else:
+                await interaction.followup.send("❌ Nie udało się pobrać informacji ze Spotify")
+                return
+                
+        elif playlist_match:
+            await interaction.followup.send("⚠️ Playlisty Spotify nie są obsługiwane. Użyj pojedynczego utworu lub playlisty YouTube.")
+            return
+        else:
+            # Normalny YouTube lub wyszukiwanie
+            search_queries = [zapytanie]
+        
         loop = asyncio.get_event_loop()
         
-        def extract_info():
+        def extract_info(query):
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                query = zapytanie
                 if not query.startswith('http'):
-                    query = f"ytsearch1:{query}"  # Pobierz tylko pierwszy wynik
+                    query = f"ytsearch1:{query}"  
                 return ydl.extract_info(query, download=False)
         
-        info = await loop.run_in_executor(None, extract_info)
+        added_count = 0
+        songs_added = []
+        is_playlist = False
         
-        # Obsługa playlist
-        if 'entries' in info:
-            entries_added = 0
-            for entry in info['entries'][:10]:  # Ogranicz do 10 pierwszych utworów
-                if entry:
+        for search_query in search_queries:
+            try:
+                info = await loop.run_in_executor(None, extract_info, search_query)
+                
+                if 'entries' in info:
+                    is_playlist = True
+                    # YouTube playlist - dodaj wszystkie utwory (max 50)
+                    max_songs = 50
+                    total_entries = len(info.get('entries', []))
+                    
+                    # Wyślij info że ładujemy playlistę
+                    if not track_match:  # Nie wysyłaj jeśli już wysłaliśmy wiadomość o Spotify
+                        await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
+                    
+                    for entry in info['entries'][:max_songs]:  
+                        if entry:
+                            # Z extract_flat dostajemy tylko podstawowe info
+                            song = {
+                                'url': f"https://www.youtube.com/watch?v={entry.get('id') or entry.get('url')}",
+                                'title': entry.get('title', 'Nieznany tytuł'),
+                                'duration': entry.get('duration', 0)
+                            }
+                            queue.add(song)
+                            songs_added.append(song)
+                            added_count += 1
+                    
+                    # Jeśli playlist ma więcej niż max_songs
+                    if total_entries > max_songs:
+                        await interaction.followup.send(
+                            f"⚠️ Playlista ma {total_entries} utworów. Dodano tylko pierwsze {max_songs}."
+                        )
+                else:
+                    # Pojedynczy utwór
                     song = {
-                        'url': entry.get('webpage_url') or entry.get('url'),
-                        'title': entry.get('title', 'Nieznany tytuł'),
-                        'duration': entry.get('duration', 0)
+                        'url': info.get('webpage_url') or info.get('url'),
+                        'title': info.get('title', 'Nieznany tytuł'),
+                        'duration': info.get('duration', 0)
                     }
                     queue.add(song)
-                    entries_added += 1
-            await interaction.followup.send(f"✅ Dodano **{entries_added}** utworów do kolejki")
+                    songs_added.append(song)
+                    added_count += 1
+                    
+            except Exception as e:
+                # Jeśli problem z konkretnym utworem, poinformuj i kontynuuj
+                error_short = str(e)[:100]
+                print(f"Błąd dodawania: {e}")
+                if not is_playlist:  # Pokazuj błędy tylko dla pojedynczych utworów
+                    await interaction.followup.send(f"⚠️ Błąd: {error_short}")
+                continue
+        
+        # Wyślij odpowiedź
+        if added_count == 1 and not is_playlist:
+            await interaction.followup.send(f"✅ Dodano do kolejki: **{songs_added[0]['title']}**")
+        elif added_count > 1:
+            if not is_playlist or not track_match:  # Nie duplikuj wiadomości
+                await interaction.followup.send(f"✅ Dodano **{added_count}** utworów do kolejki")
         else:
-            song = {
-                'url': info.get('webpage_url') or info.get('url'),
-                'title': info.get('title', 'Nieznany tytuł'),
-                'duration': info.get('duration', 0)
-            }
-            queue.add(song)
-            await interaction.followup.send(f"✅ Dodano do kolejki: **{song['title']}**")
+            await interaction.followup.send("❌ Nie znaleziono utworu")
+            return
         
         # Jeśli nic nie gra, zacznij odtwarzać
         voice_client = interaction.guild.voice_client
@@ -204,34 +351,50 @@ async def play(interaction: discord.Interaction, zapytanie: str):
             await play_next(interaction.guild)
                 
     except Exception as e:
-        await interaction.followup.send(f"❌ Błąd: {str(e)}")
+        # Pokaż pełny błąd dla debugowania
+        error_msg = f"❌ Błąd: {str(e)}"
+        if len(error_msg) > 2000:
+            error_msg = error_msg[:1997] + "..."
+        await interaction.followup.send(error_msg)
+        print(f"Pełny błąd play: {e}")
 
 @bot.tree.command(name="pause", description="Zatrzymaj odtwarzanie")
 async def pause(interaction: discord.Interaction):
-    voice_client = interaction.guild.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.pause()
-        await interaction.response.send_message("⏸️ Zatrzymano odtwarzanie")
-    else:
-        await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
+    try:
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_playing():
+            voice_client.pause()
+            await interaction.response.send_message("⏸️ Zatrzymano odtwarzanie")
+        else:
+            await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
+    except discord.errors.NotFound:
+        pass  # Interaction wygasła, ale komenda zadziałała
 
 @bot.tree.command(name="resume", description="Wznów odtwarzanie")
 async def resume(interaction: discord.Interaction):
-    voice_client = interaction.guild.voice_client
-    if voice_client and voice_client.is_paused():
-        voice_client.resume()
-        await interaction.response.send_message("▶️ Wznowiono odtwarzanie")
-    else:
-        await interaction.response.send_message("❌ Odtwarzanie nie jest zatrzymane!", ephemeral=True)
+    try:
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_paused():
+            voice_client.resume()
+            await interaction.response.send_message("▶️ Wznowiono odtwarzanie")
+        else:
+            await interaction.response.send_message("❌ Odtwarzanie nie jest zatrzymane!", ephemeral=True)
+    except discord.errors.NotFound:
+        pass  # Interaction wygasła, ale komenda zadziałała
 
 @bot.tree.command(name="skip", description="Pomiń obecny utwór")
 async def skip(interaction: discord.Interaction):
-    voice_client = interaction.guild.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.stop()
-        await interaction.response.send_message("⏭️ Pominięto utwór")
-    else:
-        await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
+    try:
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
+            await interaction.response.send_message("⏭️ Pominięto utwór")
+        else:
+            await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
+    except discord.errors.NotFound:
+        # Interaction wygasła, ale utwór został pominięty
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
 
 @bot.tree.command(name="queue", description="Pokaż kolejkę utworów")
 async def queue(interaction: discord.Interaction):
@@ -267,19 +430,25 @@ async def queue(interaction: discord.Interaction):
 
 @bot.tree.command(name="clear", description="Wyczyść kolejkę muzyki")
 async def clear(interaction: discord.Interaction):
-    queue = get_queue(interaction.guild.id)
-    queue.clear()
-    voice_client = interaction.guild.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.stop()
-    await interaction.response.send_message("🗑️ Wyczyszczono kolejkę!")
+    try:
+        queue = get_queue(interaction.guild.id)
+        queue.clear()
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
+        await interaction.response.send_message("🗑️ Wyczyszczono kolejkę!")
+    except discord.errors.NotFound:
+        pass  # Interaction wygasła, ale kolejka została wyczyszczona
 
 @bot.tree.command(name="loop", description="Włącz/wyłącz zapętlanie obecnego utworu")
 async def loop(interaction: discord.Interaction):
-    queue = get_queue(interaction.guild.id)
-    queue.loop = not queue.loop
-    status = "włączono" if queue.loop else "wyłączono"
-    await interaction.response.send_message(f"🔁 Zapętlanie {status}!")
+    try:
+        queue = get_queue(interaction.guild.id)
+        queue.loop = not queue.loop
+        status = "włączono" if queue.loop else "wyłączono"
+        await interaction.response.send_message(f"🔁 Zapętlanie {status}!")
+    except discord.errors.NotFound:
+        pass  # Interaction wygasła, ale zapętlanie zostało zmienione
 
 if __name__ == "__main__":
     if not TOKEN:

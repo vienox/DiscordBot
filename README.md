@@ -1,20 +1,54 @@
 # 🎵 Discord Music Bot
 
-Bot Discord do odtwarzania muzyki z YouTube na kanałach głosowych.
+Profesjonalny bot Discord do odtwarzania muzyki z YouTube i Spotify na kanałach głosowych.
+
+## ✨ Funkcje
+
+- 🎵 **Odtwarzanie z YouTube** - pojedyncze utwory i playlisty (do 50 utworów)
+- 🎧 **Obsługa Spotify** - automatyczne wyszukiwanie utworów ze Spotify na YouTube
+- 🔊 **Wysoka jakość audio** - 320kbps bitrate, stereo
+- 📋 **System kolejki** - zarządzaj kolejką utworów
+- 🔁 **Zapętlanie** - zapętlaj ulubione utwory
+- ⏯️ **Pełna kontrola** - pauza, wznów, pomiń
+- 🚀 **Slash commands** - nowoczesny interfejs Discord
+- 🛡️ **Stabilność** - obsługa błędów i automatyczne reconnect
 
 ## 📋 Wymagania
 
-- Python 3.8 lub nowszy
-- FFmpeg (wymagane do odtwarzania audio)
+- **Python 3.8+**
+- **FFmpeg** (wymagane do odtwarzania audio)
+- **Discord Bot Token**
 
-## 🔧 Instalacja
+## 🚀 Szybki start (Windows)
+
+### Automatyczna instalacja:
+
+1. **Uruchom instalator:**
+   ```cmd
+   install.bat
+   ```
+
+2. **Skonfiguruj token:**
+   - Otwórz plik `.env`
+   - Wklej swój Discord token
+
+3. **Uruchom bota:**
+   ```cmd
+   start_bot.bat
+   ```
+
+### Ręczna instalacja:
+
+## 🔧 Instalacja krok po kroku
 
 ### 1. Zainstaluj FFmpeg
 
 **Windows:**
-- Pobierz z: https://ffmpeg.org/download.html
-- Rozpakuj i dodaj do zmiennej PATH
-- Lub użyj: `winget install ffmpeg`
+```powershell
+winget install ffmpeg
+```
+
+Lub pobierz z: https://ffmpeg.org/download.html
 
 **Linux:**
 ```bash
@@ -27,127 +61,243 @@ sudo apt install ffmpeg
 brew install ffmpeg
 ```
 
-### 2. Zainstaluj zależności Python
+### 2. Zainstaluj biblioteki Python
 
-Biblioteki zostały już zainstalowane. Jeśli potrzebujesz reinstalacji:
 ```bash
-pip install discord.py[voice] yt-dlp python-dotenv
+pip install -r requirements.txt
+```
+
+Lub ręcznie:
+```bash
+pip install discord.py[voice] yt-dlp python-dotenv aiohttp
 ```
 
 ### 3. Utwórz bota Discord
 
-1. Idź na: https://discord.com/developers/applications
-2. Kliknij "New Application"
+1. Wejdź na: https://discord.com/developers/applications
+2. Kliknij **"New Application"**
 3. Nadaj nazwę botowi
-4. Przejdź do zakładki "Bot"
-5. Kliknij "Add Bot"
-6. Skopiuj token (kliknij "Reset Token" jeśli trzeba)
-7. Włącz następujące intencje (Privileged Gateway Intents):
-   - ✅ MESSAGE CONTENT INTENT
-   - ✅ SERVER MEMBERS INTENT
+4. Przejdź do zakładki **"Bot"**
+5. Kliknij **"Add Bot"**
+6. **Skopiuj token** (Reset Token → Copy)
+7. **Włącz Privileged Gateway Intents:**
    - ✅ PRESENCE INTENT
+   - ✅ SERVER MEMBERS INTENT  
+   - ✅ MESSAGE CONTENT INTENT
+8. Kliknij **"Save Changes"**
 
-### 4. Dodaj bota do serwera
+### 4. Dodaj bota na serwer
 
-1. Przejdź do zakładki "OAuth2" → "URL Generator"
-2. Zaznacz:
-   - **Scopes:** `bot`, `applications.commands`
-   - **Bot Permissions:** 
-     - Send Messages
-     - Connect
-     - Speak
-     - Use Voice Activity
-3. Skopiuj wygenerowany URL i otwórz w przeglądarce
-4. Wybierz serwer i autoryzuj bota
+1. Przejdź do **"OAuth2" → "URL Generator"**
+2. Zaznacz **Scopes:**
+   - ✅ `bot`
+   - ✅ `applications.commands`
+3. Zaznacz **Bot Permissions:**
+   - ✅ Send Messages
+   - ✅ Connect
+   - ✅ Speak
+   - ✅ Use Voice Activity
+4. Skopiuj **wygenerowany URL**
+5. Otwórz w przeglądarce i dodaj na serwer
 
-### 5. Skonfiguruj token
+### 5. Konfiguracja
 
-Otwórz plik `.env` i wklej swój token:
+Edytuj plik `.env`:
+```env
+DISCORD_TOKEN=twoj_token_tutaj
 ```
-DISCORD_TOKEN=tutaj_wklej_swoj_token
+
+## 🎮 Uruchamianie
+
+**Windows (z skryptem):**
+```cmd
+start_bot.bat
 ```
 
-## 🚀 Uruchamianie
-
+**Ręcznie:**
 ```bash
 python main.py
 ```
 
-Jeśli wszystko działa poprawnie, zobaczysz:
+Komunikat o sukcesie:
 ```
-NazwaBota#1234 jest online!
-Zsynchronizowano X komend
+Używam FFmpeg z: C:\ffmpeg\bin\ffmpeg.exe
+BotName#1234 jest online!
+Zsynchronizowano 9 komend
 ```
 
 ## 📖 Komendy
 
-Wszystkie komendy używają slash commands (`/`):
-
-| Komenda | Opis |
-|---------|------|
-| `/join` | Bot dołącza do Twojego kanału głosowego |
-| `/leave` | Bot opuszcza kanał głosowy |
-| `/play <zapytanie>` | Odtwórz utwór (nazwa lub link YouTube) |
-| `/pause` | Zatrzymaj odtwarzanie |
-| `/resume` | Wznów odtwarzanie |
-| `/skip` | Pomiń obecny utwór |
-| `/queue` | Pokaż kolejkę utworów |
-| `/clear` | Wyczyść kolejkę muzyki |
-| `/loop` | Włącz/wyłącz zapętlanie utworu |
+| Komenda | Opis | Przykład |
+|---------|------|----------|
+| `/help` | Pokaż pomoc | `/help` |
+| `/join` | Dołącz do kanału głosowego | `/join` |
+| `/leave` | Opuść kanał | `/leave` |
+| `/play <zapytanie>` | Odtwórz muzykę | `/play never gonna give you up` |
+| `/pause` | Zatrzymaj odtwarzanie | `/pause` |
+| `/resume` | Wznów odtwarzanie | `/resume` |
+| `/skip` | Pomiń utwór | `/skip` |
+| `/queue` | Pokaż kolejkę | `/queue` |
+| `/clear` | Wyczyść kolejkę | `/clear` |
+| `/loop` | Zapętl utwór | `/loop` |
 
 ## 💡 Przykłady użycia
 
+**YouTube:**
 ```
-/join
 /play never gonna give you up
 /play https://www.youtube.com/watch?v=dQw4w9WgXcQ
-/play https://www.youtube.com/playlist?list=...
-/pause
-/resume
-/skip
-/queue
-/loop
-/clear
-/leave
+/play https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG
 ```
 
-## 🛠️ Funkcje
+**Spotify:**
+```
+/play https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT
+```
+*Uwaga: Bot wyszukuje utwory Spotify na YouTube*
 
-- ✅ Odtwarzanie muzyki z YouTube (pojedyncze utwory i playlisty)
-- ✅ Kolejka utworów
-- ✅ Pauza/wznowienie
-- ✅ Pomijanie utworów
-- ✅ Zapętlanie utworu
-- ✅ Automatyczne rozłączanie po 3 minutach bezczynności
-- ✅ Slash commands (nowoczesne komendy Discord)
+**Kontrola odtwarzania:**
+```
+/pause          # Zatrzymaj
+/resume         # Wznów
+/skip           # Następny utwór
+/loop           # Zapętl obecny utwór
+/queue          # Zobacz kolejkę
+/clear          # Wyczyść wszystko
+```
+
+## 🎵 Obsługiwane źródła
+
+- ✅ **YouTube** - filmy i playlisty (max 50 utworów)
+- ✅ **Spotify** - pojedyncze utwory (konwertowane do YouTube)
+- ✅ **Wyszukiwanie** - bezpośrednie wyszukiwanie po nazwie
+
+## ⚙️ Konfiguracja zaawansowana
+
+### Jakość audio
+
+Bot domyślnie używa:
+- **320kbps bitrate**
+- **48kHz sample rate**
+- **Stereo**
+
+Możesz zmienić w `main.py`:
+```python
+FFMPEG_OPTIONS = {
+    'options': '-vn -b:a 320k -ar 48000 -ac 2'
+}
+```
+
+### Limit playlist
+
+Domyślnie: **50 utworów**
+
+Zmień w `main.py` (linia ~294):
+```python
+max_songs = 50  # Zmień na dowolną liczbę
+```
 
 ## ⚠️ Rozwiązywanie problemów
 
-### Bot nie łączy się z kanałem głosowym
-- Sprawdź czy FFmpeg jest zainstalowany: `ffmpeg -version`
-- Upewnij się, że bot ma uprawnienia do połączenia z kanałem
+### Bot nie uruchamia się
 
-### "❌ Błąd: Nie znaleziono DISCORD_TOKEN"
+**Problem:** `ModuleNotFoundError: No module named 'discord'`
+```bash
+pip install -r requirements.txt
+```
+
+**Problem:** `Nie znaleziono DISCORD_TOKEN`
 - Sprawdź czy plik `.env` istnieje
-- Upewnij się, że token jest poprawnie wklejony
+- Upewnij się że token jest poprawny
+
+### Bot nie łączy się z kanałem
+
+**Problem:** `ffmpeg was not found`
+```bash
+# Sprawdź FFmpeg
+ffmpeg -version
+
+# Windows - zainstaluj
+winget install ffmpeg
+```
+
+**Problem:** `PrivilegedIntentsRequired`
+- Włącz wszystkie 3 Intents w Developer Portal (Bot → Privileged Gateway Intents)
 
 ### Bot nie odpowiada na komendy
-- Poczekaj 5-10 minut po dodaniu bota (synchronizacja komend)
-- Sprawdź czy MESSAGE CONTENT INTENT jest włączony
-- Użyj `/` aby zobaczyć dostępne komendy
 
-### Błędy podczas odtwarzania
-- Sprawdź połączenie internetowe
-- Niektóre filmy mogą być zablokowane w Twoim regionie
-- Spróbuj zaktualizować yt-dlp: `pip install --upgrade yt-dlp`
+- Poczekaj **5-10 minut** po dodaniu (synchronizacja)
+- Sprawdź czy **MESSAGE CONTENT INTENT** jest włączony
+- Zrestartuj bota
 
-## 📝 Licencja
+### Problemy z odtwarzaniem
 
-Projekt open-source - możesz go swobodnie modyfikować i używać!
+**Problem:** Bot się zawiesza przy playlistach
+- Normalne przy dużych playlistach (ładowanie ~2-3 sekundy)
+- Bot używa `extract_flat` dla szybkości
+
+**Problem:** "Unknown interaction"
+- Discord timeout (3 sekundy) - normalne przy większych playlistach
+- Muzyka powinna się odtwarzać mimo błędu
+
+**Problem:** Słaba jakość audio
+- Sprawdź ustawienia Discord (User Settings → Voice & Video → Audio Quality: High)
+- Bot już używa 320kbps
+
+## 🔒 Bezpieczeństwo
+
+- ✅ Token w pliku `.env` (nie commituj do git!)
+- ✅ `.gitignore` chroni wrażliwe pliki
+- ✅ Brak zapisywania muzyki na dysku
+- ✅ Streaming bezpośrednio z YouTube
+
+## 🌐 Hosting (24/7)
+
+### Darmowe opcje:
+
+**Railway.app (Polecane):**
+1. Push kod na GitHub
+2. railway.app → Deploy from GitHub
+3. Dodaj zmienną `DISCORD_TOKEN`
+4. Bot działa 24/7 (500h/miesiąc free)
+
+**Render.com:**
+- Darmowy tier
+- Bot uśpia się po 15 min nieaktywności
+
+**fly.io:**
+- Darmowy tier wystarczający dla małych botów
+
+### Pliki potrzebne do hostingu:
+- ✅ `Procfile` - już utworzony
+- ✅ `requirements.txt` - aktualne
+- ✅ `.gitignore` - zabezpiecza token
+
+## 📁 Struktura projektu
+
+```
+DiscordBot/
+├── main.py              # Główny kod bota
+├── .env                 # Token Discord (NIE commituj!)
+├── .gitignore          # Pliki ignorowane przez git
+├── requirements.txt     # Zależności Python
+├── Procfile            # Konfiguracja dla hostingu
+├── README.md           # Ta dokumentacja
+├── start_bot.bat       # Skrypt uruchamiający (Windows)
+└── install.bat         # Skrypt instalacyjny (Windows)
+```
 
 ## 🤝 Wsparcie
 
-Jeśli napotkasz problemy:
-1. Sprawdź sekcję "Rozwiązywanie problemów"
-2. Upewnij się, że wszystkie wymagania są spełnione
-3. Sprawdź logi w terminalu po uruchomieniu bota
+Problemy? Sprawdź:
+1. Sekcję "Rozwiązywanie problemów" powyżej
+2. Logi w terminalu
+3. Issues na GitHub
+
+## 📝 Licencja
+
+Open-source - używaj i modyfikuj swobodnie!
+
+---
+
+**Stworzony z ❤️ | Obsługuje YouTube i Spotify**

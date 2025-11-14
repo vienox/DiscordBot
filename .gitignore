@@ -1,5 +1,7 @@
-# Token Discord
+# Discord Bot Token - NIGDY NIE COMMITUJ!
 .env
+.env.local
+.env.*.local
 
 # Python
 __pycache__/
@@ -7,16 +9,115 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 venv/
+.venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
-# IDE
-.vscode/
+# PyCharm
 .idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
 *.swp
 *.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# JetBrains
+*.iml
+.idea/
+.idea_modules/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Audio cache (jeśli bot pobiera pliki tymczasowe)
+*.webm
+*.m4a
+*.mp3
+*.opus
+downloads/
+temp/
+cache/
+
+# FFmpeg
+ffmpeg-*.zip
+
+# Test files
+test_*.py
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database files (jeśli dodasz bazę danych)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
