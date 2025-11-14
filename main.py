@@ -387,8 +387,21 @@ async def skip(interaction: discord.Interaction):
     try:
         voice_client = interaction.guild.voice_client
         if voice_client and voice_client.is_playing():
+            queue = get_queue(interaction.guild.id)
+            
+            # Sprawdź co będzie dalej
+            next_song = None
+            if queue.loop and queue.current:
+                next_song = queue.current
+            elif queue.queue:
+                next_song = queue.queue[0]
+            
             voice_client.stop()
-            await interaction.response.send_message("⏭️ Pominięto utwór")
+            
+            if next_song:
+                await interaction.response.send_message(f"⏭️ Pominięto utwór\n▶️ Teraz gra: **{next_song['title']}**")
+            else:
+                await interaction.response.send_message("⏭️ Pominięto utwór (to był ostatni w kolejce)")
         else:
             await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
     except discord.errors.NotFound:
