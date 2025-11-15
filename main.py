@@ -12,15 +12,13 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Przygotuj cookies dla yt-dlp
-COOKIES_FILE = 'cookies.txt'
-if os.getenv('YOUTUBE_COOKIES'):
-    # Na hostingu - zapisz cookies ze zmiennej środowiskowej
-    with open(COOKIES_FILE, 'w') as f:
-        f.write(os.getenv('YOUTUBE_COOKIES'))
-elif not os.path.exists(COOKIES_FILE):
-    # Lokalnie - użyj cookies z pliku (jeśli istnieje)
-    print("⚠️ Ostrzeżenie: Brak pliku cookies.txt - YouTube może nie działać")
+# Opcja: użyj cookies jeśli USE_COOKIES=true w .env
+USE_COOKIES = os.getenv('USE_COOKIES', 'false').lower() == 'true'
+
+if USE_COOKIES:
+    print("Cookies YouTube włączone")
+else:
+    print("Cookies YouTube wyłączone")
 
 # Znajdź FFmpeg
 def find_ffmpeg():
@@ -66,13 +64,16 @@ YDL_OPTIONS = {
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
     'ignoreerrors': True,
-    'cookiefile': 'cookies.txt',  # Plik cookies z YouTube
     'postprocessors': [{  # Konwersja do najlepszej jakości
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'opus',
         'preferredquality': '320',
     }],
 }
+
+# Dodaj cookies tylko jeśli są włączone
+if USE_COOKIES:
+    YDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
@@ -127,26 +128,72 @@ async def get_spotify_playlist_info(playlist_id):
     # Dla playlist używamy tylko pierwszego utworu lub informujemy użytkownika
     return None
 
-async def play_next(guild):
+async def play_next(guild, text_channel=None):
     queue = get_queue(guild.id)
     voice_client = discord.utils.get(bot.voice_clients, guild=guild)
+    
+    # Jeśli nie przekazano kanału, spróbuj użyć zapisanego
+    if not text_channel and hasattr(bot, 'text_channels'):
+        text_channel = bot.text_channels.get(guild.id)
     
     if voice_client and voice_client.is_connected():
         song = queue.get_next()
         if song:
-            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-                info = ydl.extract_info(song['url'], download=False)
-                url = info['url']
-                
-            voice_client.play(
-                discord.FFmpegPCMAudio(url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS),
-                after=lambda e: asyncio.run_coroutine_threadsafe(
-                    play_next(guild), bot.loop
+            try:
+                with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                    info = ydl.extract_info(song['url'], download=False)
+                    
+                    # Sprawdź czy film jest 18+
+                    age_limit = info.get('age_limit', 0)
+                    if age_limit >= 18:
+                        # Film 18+ - pomiń i wyświetl ostrzeżenie
+                        if text_channel:
+                            try:
+                                embed = discord.Embed(
+                                    description=f"🔞 **Pominięto:** {song['title']}\n⚠️ Powód: Treść 18+",
+                                    color=discord.Color.orange()
+                                )
+                                await text_channel.send(embed=embed)
+                            except:
+                                pass
+                        # Przejdź do następnego utworu
+                        await play_next(guild, text_channel)
+                        return
+                    
+                    url = info['url']
+                    
+                voice_client.play(
+                    discord.FFmpegPCMAudio(url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS),
+                    after=lambda e: asyncio.run_coroutine_threadsafe(
+                        play_next(guild, text_channel), bot.loop
+                    )
                 )
-            )
+                
+                # Wyślij wiadomość na czat o nowej piosence
+                if text_channel:
+                    try:
+                        embed = discord.Embed(
+                            description=f"🎵 **Teraz gra:** {song['title']}",
+                            color=discord.Color.blue()
+                        )
+                        await text_channel.send(embed=embed)
+                    except:
+                        pass  # Ignoruj błędy wysyłania wiadomości
+                        
+            except Exception as e:
+                # Błąd pobierania - pomiń utwór
+                if text_channel:
+                    try:
+                        await text_channel.send(f"18+  {song['title'][:50]}... - szkip")
+                    except:
+                        pass
+                # Spróbuj następny utwór
+                await play_next(guild, text_channel)
+                return
         else:
-            await asyncio.sleep(180)  
-            if voice_client and not voice_client.is_playing():
+            # Kolejka pusta - czekaj 5 minut i rozłącz jeśli dalej nic nie gra
+            await asyncio.sleep(300)  # 5 minut
+            if voice_client and not voice_client.is_playing() and len(queue.queue) == 0:
                 await voice_client.disconnect()
 
 @bot.event
@@ -239,7 +286,7 @@ async def leave(interaction: discord.Interaction):
         await interaction.guild.voice_client.disconnect()
         await interaction.response.send_message("👋 Rozłączono!")
     else:
-        await interaction.response.send_message("❌ Bot nie jest na żadnym kanale!", ephemeral=True)
+        await interaction.response.send_message("❌ Wyrzucono z kanału głosowego", ephemeral=True)
 
 @bot.tree.command(name="play", description="Odtwórz utwór z YouTube lub Spotify")
 @app_commands.describe(zapytanie="Nazwa utworu, link YouTube lub Spotify")
@@ -253,6 +300,11 @@ async def play(interaction: discord.Interaction, zapytanie: str):
     if not interaction.guild.voice_client:
         channel = interaction.user.voice.channel
         await channel.connect()
+    
+    # Zapisz kanał tekstowy dla powiadomień
+    if not hasattr(bot, 'text_channels'):
+        bot.text_channels = {}
+    bot.text_channels[interaction.guild.id] = interaction.channel
     
     queue = get_queue(interaction.guild.id)
     
@@ -289,7 +341,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
         def extract_info(query):
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 if not query.startswith('http'):
-                    query = f"ytsearch1:{query}"  
+                    query = f"ytsearch5:{query}"  # Szukaj 5 wyników i wybierz najlepszy
                 return ydl.extract_info(query, download=False)
         
         added_count = 0
@@ -301,18 +353,20 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 info = await loop.run_in_executor(None, extract_info, search_query)
                 
                 if 'entries' in info:
-                    is_playlist = True
-                    # YouTube playlist - dodaj wszystkie utwory (max 50)
-                    max_songs = 50
-                    total_entries = len(info.get('entries', []))
+                    entries = [e for e in info.get('entries', []) if e]  # Filtruj puste
                     
-                    # Wyślij info że ładujemy playlistę
-                    if not track_match:  # Nie wysyłaj jeśli już wysłaliśmy wiadomość o Spotify
-                        await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
-                    
-                    for entry in info['entries'][:max_songs]:  
-                        if entry:
-                            # Z extract_flat dostajemy tylko podstawowe info
+                    # Sprawdź czy to wyszukiwanie czy playlista
+                    if search_query.startswith('http') and ('playlist' in search_query or 'list=' in search_query):
+                        # To jest playlista YouTube - dodaj wszystkie utwory (max 50)
+                        is_playlist = True
+                        max_songs = 50
+                        total_entries = len(entries)
+                        
+                        # Wyślij info że ładujemy playlistę
+                        if not track_match:
+                            await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
+                        
+                        for entry in entries[:max_songs]:  
                             song = {
                                 'url': f"https://www.youtube.com/watch?v={entry.get('id') or entry.get('url')}",
                                 'title': entry.get('title', 'Nieznany tytuł'),
@@ -321,12 +375,24 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                             queue.add(song)
                             songs_added.append(song)
                             added_count += 1
-                    
-                    # Jeśli playlist ma więcej niż max_songs
-                    if total_entries > max_songs:
-                        await interaction.followup.send(
-                            f"⚠️ Playlista ma {total_entries} utworów. Dodano tylko pierwsze {max_songs}."
-                        )
+                        
+                        # Jeśli playlist ma więcej niż max_songs
+                        if total_entries > max_songs:
+                            await interaction.followup.send(
+                                f"⚠️ Playlista ma {total_entries} utworów. Dodano tylko pierwsze {max_songs}."
+                            )
+                    else:
+                        # To jest wyszukiwanie - weź TYLKO pierwszy wynik
+                        if entries:
+                            entry = entries[0]  # Najlepszy wynik
+                            song = {
+                                'url': f"https://www.youtube.com/watch?v={entry.get('id') or entry.get('url')}",
+                                'title': entry.get('title', 'Nieznany tytuł'),
+                                'duration': entry.get('duration', 0)
+                            }
+                            queue.add(song)
+                            songs_added.append(song)
+                            added_count += 1
                 else:
                     # Pojedynczy utwór
                     song = {
@@ -347,8 +413,16 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 continue
         
         # Wyślij odpowiedź
+        voice_client = interaction.guild.voice_client
+        was_playing = voice_client.is_playing() or voice_client.is_paused()
+        
         if added_count == 1 and not is_playlist:
-            await interaction.followup.send(f"✅ Dodano do kolejki: **{songs_added[0]['title']}**")
+            if was_playing:
+                # Coś już gra - tylko dodano do kolejki
+                await interaction.followup.send(f"✅ Dodano do kolejki: **{songs_added[0]['title']}**")
+            else:
+                # Nic nie gra - zacznij grać (play_next wyświetli "Teraz gra")
+                await interaction.followup.send(f"✅ Dodano: **{songs_added[0]['title']}**")
         elif added_count > 1:
             if not is_playlist or not track_match:  # Nie duplikuj wiadomości
                 await interaction.followup.send(f"✅ Dodano **{added_count}** utworów do kolejki")
@@ -357,9 +431,8 @@ async def play(interaction: discord.Interaction, zapytanie: str):
             return
         
         # Jeśli nic nie gra, zacznij odtwarzać
-        voice_client = interaction.guild.voice_client
-        if not voice_client.is_playing() and not voice_client.is_paused():
-            await play_next(interaction.guild)
+        if not was_playing:
+            await play_next(interaction.guild, interaction.channel)
                 
     except Exception as e:
         # Pokaż pełny błąd dla debugowania
@@ -407,10 +480,16 @@ async def skip(interaction: discord.Interaction):
             elif queue.queue:
                 next_song = queue.queue[0]
             
+            # Zapisz kanał tekstowy dla play_next
+            guild_id = interaction.guild.id
+            if not hasattr(bot, 'text_channels'):
+                bot.text_channels = {}
+            bot.text_channels[guild_id] = interaction.channel
+            
             voice_client.stop()
             
             if next_song:
-                await interaction.response.send_message(f"⏭️ Pominięto utwór\n▶️ Teraz gra: **{next_song['title']}**")
+                await interaction.response.send_message(f"⏭️ Pominięto utwór")
             else:
                 await interaction.response.send_message("⏭️ Pominięto utwór (to był ostatni w kolejce)")
         else:
