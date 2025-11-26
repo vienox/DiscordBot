@@ -109,6 +109,18 @@ def get_queue(guild_id):
         music_queues[guild_id] = MusicQueue()
     return music_queues[guild_id]
 
+async def cleanup_guild_state(guild):
+    """Rozlacz bota i usun stan kolejki oraz zapamietane kanaly tekstowe dla serwera."""
+    guild_id = guild.id
+    queue = music_queues.pop(guild_id, None)
+    if queue:
+        queue.clear()
+    if hasattr(bot, 'text_channels'):
+        bot.text_channels.pop(guild_id, None)
+    voice_client = guild.voice_client
+    if voice_client and voice_client.is_connected():
+        await voice_client.disconnect(force=True)
+
 async def get_spotify_track_info(track_id):
     """Pobierz informacje o utworze ze Spotify (bez autoryzacji)"""
     url = f"https://open.spotify.com/oembed?url=spotify:track:{track_id}"
@@ -205,6 +217,22 @@ async def on_ready():
     except Exception as e:
         print(f'Błąd synchronizacji: {e}')
 
+@bot.event
+async def on_voice_state_update(member, before, after):
+    # Jeżeli bot został przeniesiony do innego kanału głosowego, wyczyść stan jak po /leave
+    if not bot.user or member.id != bot.user.id:
+        return
+    if before.channel and after.channel and before.channel != after.channel:
+        text_channel = None
+        if hasattr(bot, 'text_channels'):
+            text_channel = bot.text_channels.get(member.guild.id)
+        await cleanup_guild_state(member.guild)
+        if text_channel:
+            try:
+                await text_channel.send("Kanal glosowy zostal zmieniony - bot rozlaczyl sie i wyczyscil kolejke.")
+            except:
+                pass
+
 @bot.tree.command(name="help", description="Pokaż listę wszystkich komend")
 async def help_command(interaction: discord.Interaction):
     try:
@@ -281,9 +309,7 @@ async def join(interaction: discord.Interaction):
 @bot.tree.command(name="leave", description="Bot opuszcza kanał głosowy")
 async def leave(interaction: discord.Interaction):
     if interaction.guild.voice_client:
-        queue = get_queue(interaction.guild.id)
-        queue.clear()
-        await interaction.guild.voice_client.disconnect()
+        await cleanup_guild_state(interaction.guild)
         await interaction.response.send_message("👋 Rozłączono!")
     else:
         await interaction.response.send_message("❌ Wyrzucono z kanału głosowego", ephemeral=True)
