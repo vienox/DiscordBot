@@ -7,6 +7,7 @@ import os
 import shutil
 import re
 import aiohttp
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -121,24 +122,98 @@ async def cleanup_guild_state(guild):
     if voice_client and voice_client.is_connected():
         await voice_client.disconnect(force=True)
 
-async def get_spotify_track_info(track_id):
-    """Pobierz informacje o utworze ze Spotify (bez autoryzacji)"""
+async def get_spotify_track_info(track_id, session=None):
+    """Pobierz informacje o utworze ze Spotify (bez autoryzacji)."""
     url = f"https://open.spotify.com/oembed?url=spotify:track:{track_id}"
-    async with aiohttp.ClientSession() as session:
+    owns_session = False
+    if session is None:
+        session = aiohttp.ClientSession()
+        owns_session = True
+    try:
         async with session.get(url) as response:
             if response.status == 200:
                 data = await response.json()
-                # Format: "Artist - Title"
-                title_parts = data.get('title', '').split(' · ')
-                if len(title_parts) >= 2:
-                    return f"{title_parts[1]} {title_parts[0]}"  # Artist Title
-                return data.get('title', '')
+                title = data.get('title') or ''
+                artist = data.get('author_name') or ''
+                if title and artist:
+                    return f"{artist} {title}"
+                if title:
+                    return title
+    except Exception as e:
+        print(f"Blad Spotify track {track_id}: {e}")
+    finally:
+        if owns_session:
+            await session.close()
     return None
 
 async def get_spotify_playlist_info(playlist_id):
-    """Pobierz informacje o playliście (wymaga web scraping - uproszczona wersja)"""
-    # Dla playlist używamy tylko pierwszego utworu lub informujemy użytkownika
-    return None
+    """Pobierz utwory z playlisty/albumu Spotify przez scraping."""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        }
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Najpierw spróbuj playlisty, potem album
+            html = None
+            url = f"https://open.spotify.com/playlist/{playlist_id}"
+            async with session.get(url, headers=headers) as response:
+                if response.status == 404:
+                    url = f"https://open.spotify.com/album/{playlist_id}"
+                    async with session.get(url, headers=headers) as resp2:
+                        if resp2.status != 200:
+                            return None
+                        html = await resp2.text()
+                elif response.status == 200:
+                    html = await response.text()
+                else:
+                    return None
+            
+            if not html:
+                return None
+            
+            # Wyciągnij ID utworów z HTML (spotify:track:ID lub /track/ID)
+            track_ids = []
+            for tid in re.findall(r'spotify:track:([a-zA-Z0-9]+)', html):
+                if tid not in track_ids:
+                    track_ids.append(tid)
+            for tid in re.findall(r'/track/([a-zA-Z0-9]+)', html):
+                if tid not in track_ids:
+                    track_ids.append(tid)
+            
+            if not track_ids:
+                print("Spotify: Nie znaleziono ID utworów")
+                return None
+            
+            max_tracks = 50
+            track_ids = track_ids[:max_tracks]
+            
+            semaphore = asyncio.Semaphore(5)
+            
+            async def fetch_name(tid):
+                async with semaphore:
+                    return await get_spotify_track_info(tid, session=session)
+            
+            results = await asyncio.gather(*[fetch_name(tid) for tid in track_ids], return_exceptions=True)
+            tracks = []
+            for res in results:
+                if isinstance(res, str) and res.strip():
+                    if res not in tracks:
+                        tracks.append(res)
+            
+            if tracks:
+                print(f"Spotify: Znaleziono {len(tracks)} utworów")
+                return tracks
+            
+            print("Spotify: Nie znaleziono utworów (brak nazw)")
+            return None
+        
+    except asyncio.TimeoutError:
+        print("Spotify: Timeout")
+        return None
+    except Exception as e:
+        print(f"Blad Spotify: {e}")
+        return None
 
 async def play_next(guild, text_channel=None):
     queue = get_queue(guild.id)
@@ -280,7 +355,9 @@ async def help_command(interaction: discord.Interaction):
                 "`/play never gonna give you up`\n"
                 "`/play https://www.youtube.com/watch?v=...`\n"
                 "`/play https://www.youtube.com/playlist?list=...`\n"
-                "`/play https://open.spotify.com/track/...`"
+                "`/play https://open.spotify.com/track/...`\n"
+                "`/play https://open.spotify.com/playlist/...`\n"
+                "`/play https://open.spotify.com/album/...`"
             ),
             inline=False
         )
@@ -317,10 +394,17 @@ async def leave(interaction: discord.Interaction):
 @bot.tree.command(name="play", description="Odtwórz utwór z YouTube lub Spotify")
 @app_commands.describe(zapytanie="Nazwa utworu, link YouTube lub Spotify")
 async def play(interaction: discord.Interaction, zapytanie: str):
-    await interaction.response.defer()
+    try:
+        await interaction.response.defer()
+    except discord.errors.NotFound:
+        # Timeout - ale kontynuuj operację
+        pass
     
     if not interaction.user.voice:
-        await interaction.followup.send("❌ Musisz być na kanale głosowym!")
+        try:
+            await interaction.followup.send("❌ Musisz być na kanale głosowym!")
+        except:
+            pass
         return
         
     if not interaction.guild.voice_client:
@@ -337,7 +421,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
     try:
         # Sprawdź czy to link Spotify
         spotify_track_pattern = r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)'
-        spotify_playlist_pattern = r'https?://open\.spotify\.com/playlist/([a-zA-Z0-9]+)'
+        spotify_playlist_pattern = r'https?://open\.spotify\.com/(playlist|album)/([a-zA-Z0-9]+)'
         
         track_match = re.search(spotify_track_pattern, zapytanie)
         playlist_match = re.search(spotify_playlist_pattern, zapytanie)
@@ -356,8 +440,17 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 return
                 
         elif playlist_match:
-            await interaction.followup.send("⚠️ Playlisty Spotify nie są obsługiwane. Użyj pojedynczego utworu lub playlisty YouTube.")
-            return
+            # Scraping playlisty/albumu Spotify
+            playlist_id = playlist_match.group(2)
+            await interaction.followup.send("📥 Pobieram playlistę Spotify...")
+            
+            tracks = await get_spotify_playlist_info(playlist_id)
+            if tracks:
+                search_queries = tracks
+                await interaction.followup.send(f"✅ Znaleziono {len(tracks)} utworów ze Spotify")
+            else:
+                await interaction.followup.send("❌ Nie udało się pobrać playlisty Spotify")
+                return
         else:
             # Normalny YouTube lub wyszukiwanie
             search_queries = [zapytanie]

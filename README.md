@@ -5,11 +5,12 @@ Bot Discord do odtwarzania muzyki z YouTube i Spotify.
 ## Funkcje
 
 - Odtwarzanie z YouTube (pojedyncze utwory i playlisty)
-- Obsługa linków Spotify
+- Obsługa Spotify (tracki, playlisty, albumy) - web scraping bez API
 - Jakość audio 320kbps
 - System kolejki
 - Zapętlanie utworów
 - Kontrola odtwarzania (pause/resume/skip)
+- Automatyczne pomijanie filmów 18+
 
 ## Wymagania
 
@@ -42,6 +43,8 @@ winget install ffmpeg
 ```bash
 pip install -r requirements.txt
 ```
+
+Pakiety: `discord.py[voice]`, `yt-dlp`, `python-dotenv`, `aiohttp`, `beautifulsoup4`
 
 **3. Stwórz bota Discord:**
 - https://discord.com/developers/applications
@@ -76,14 +79,21 @@ python main.py
 | `/skip` | Pomiń |
 | `/queue` | Pokaż kolejkę |
 | `/clear` | Wyczyść kolejkę |
-| `/loop` | Zapętl utwór |
-
 ## Przykłady
 
 ```
 /play never gonna give you up
 /play https://youtube.com/watch?v=...
 /play https://youtube.com/playlist?list=...
+/play https://open.spotify.com/track/...
+/play https://open.spotify.com/playlist/...
+/play https://open.spotify.com/album/...
+```
+
+**Spotify:**
+- Playlisty i albumy scrapowane automatycznie (max 50 utworów)
+- Każdy utwór wyszukiwany na YouTube
+- Bez potrzeby API key czy konta Spotifyay https://youtube.com/playlist?list=...
 /play https://open.spotify.com/track/...
 ```
 
