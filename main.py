@@ -122,97 +122,73 @@ async def cleanup_guild_state(guild):
     if voice_client and voice_client.is_connected():
         await voice_client.disconnect(force=True)
 
-async def get_spotify_track_info(track_id, session=None):
-    """Pobierz informacje o utworze ze Spotify (bez autoryzacji)."""
+async def get_spotify_track_info(track_id):
+    """Pobierz informacje o utworze ze Spotify (bez autoryzacji)"""
     url = f"https://open.spotify.com/oembed?url=spotify:track:{track_id}"
-    owns_session = False
-    if session is None:
-        session = aiohttp.ClientSession()
-        owns_session = True
-    try:
+    async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             if response.status == 200:
                 data = await response.json()
-                title = data.get('title') or ''
-                artist = data.get('author_name') or ''
-                if title and artist:
-                    return f"{artist} {title}"
-                if title:
-                    return title
-    except Exception as e:
-        print(f"Blad Spotify track {track_id}: {e}")
-    finally:
-        if owns_session:
-            await session.close()
+                # Format: "Artist - Title"
+                title_parts = data.get('title', '').split(' · ')
+                if len(title_parts) >= 2:
+                    return f"{title_parts[1]} {title_parts[0]}"  # Artist Title
+                return data.get('title', '')
     return None
 
 async def get_spotify_playlist_info(playlist_id):
-    """Pobierz utwory z playlisty/albumu Spotify przez scraping."""
+    """Pobierz utwory z playlisty/albumu Spotify przez scraping"""
     try:
+        # Spróbuj jako playlist
+        url = f"https://open.spotify.com/playlist/{playlist_id}"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         }
+        
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            # Najpierw spróbuj playlisty, potem album
-            html = None
-            url = f"https://open.spotify.com/playlist/{playlist_id}"
             async with session.get(url, headers=headers) as response:
                 if response.status == 404:
+                    # Spróbuj jako album
                     url = f"https://open.spotify.com/album/{playlist_id}"
                     async with session.get(url, headers=headers) as resp2:
                         if resp2.status != 200:
                             return None
                         html = await resp2.text()
-                elif response.status == 200:
-                    html = await response.text()
-                else:
+                elif response.status != 200:
                     return None
-            
-            if not html:
-                return None
-            
-            # Wyciągnij ID utworów z HTML (spotify:track:ID lub /track/ID)
-            track_ids = []
-            for tid in re.findall(r'spotify:track:([a-zA-Z0-9]+)', html):
-                if tid not in track_ids:
-                    track_ids.append(tid)
-            for tid in re.findall(r'/track/([a-zA-Z0-9]+)', html):
-                if tid not in track_ids:
-                    track_ids.append(tid)
-            
-            if not track_ids:
-                print("Spotify: Nie znaleziono ID utworów")
-                return None
-            
-            max_tracks = 50
-            track_ids = track_ids[:max_tracks]
-            
-            semaphore = asyncio.Semaphore(5)
-            
-            async def fetch_name(tid):
-                async with semaphore:
-                    return await get_spotify_track_info(tid, session=session)
-            
-            results = await asyncio.gather(*[fetch_name(tid) for tid in track_ids], return_exceptions=True)
-            tracks = []
-            for res in results:
-                if isinstance(res, str) and res.strip():
-                    if res not in tracks:
-                        tracks.append(res)
-            
-            if tracks:
-                print(f"Spotify: Znaleziono {len(tracks)} utworów")
-                return tracks
-            
-            print("Spotify: Nie znaleziono utworów (brak nazw)")
-            return None
+                else:
+                    html = await response.text()
+        
+        # Prosta regex metoda - szukaj wszystkich par artist+title
+        tracks = []
+        
+        # Pattern 1: JSON data w HTML
+        pattern1 = re.findall(r'"name":"([^"]{2,})"[^}]*"artists":\[{[^}]*"name":"([^"]{2,})"', html)
+        for title, artist in pattern1:
+            if title and artist and len(title) > 1 and len(artist) > 1:
+                track_str = f"{artist} {title}"
+                if track_str not in tracks:  # Usuń duplikaty
+                    tracks.append(track_str)
+        
+        if tracks:
+            print(f"Spotify: Znaleziono {len(tracks)} utworów")
+            return tracks[:50]
+        
+        print("Spotify: Nie znaleziono utworów")
+        return None
         
     except asyncio.TimeoutError:
         print("Spotify: Timeout")
         return None
     except Exception as e:
-        print(f"Blad Spotify: {e}")
+        print(f"Błąd Spotify: {e}")
+        return None
+        
+        return None
+        
+    except Exception as e:
+        print(f"Błąd scraping: {e}")
         return None
 
 async def play_next(guild, text_channel=None):
@@ -671,6 +647,96 @@ async def loop(interaction: discord.Interaction):
         await interaction.response.send_message(f"🔁 Zapętlanie {status}!")
     except discord.errors.NotFound:
         pass  # Interaction wygasła, ale zapętlanie zostało zmienione
+
+# Giveaway system
+giveaways = {}  
+@bot.tree.command(name="giveaway", description="Zacznij giveaway - ludzie wpisują /ticket aby wziąć udział")
+async def giveaway(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    
+    # Sprawdź czy giveaway już istnieje
+    if guild_id in giveaways and giveaways[guild_id]['active']:
+        await interaction.response.send_message("❌ Giveaway już trwa! Użyj `/results` aby wylosować zwycięzcę.", ephemeral=True)
+        return
+    
+    # Stwórz nowy giveaway
+    giveaways[guild_id] = {'users': [], 'active': True}
+    
+    embed = discord.Embed(
+        title="🎉 GIVEAWAY ROZPOCZĘTY!",
+        description="Wpisz `/ticket` aby wziąć udział w giveaway!",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="Uczestnicy", value="0", inline=False)
+    embed.set_footer(text="Wpisz /ticket aby dołączyć")
+    
+    msg = await interaction.response.send_message(embed=embed, fetch_reply=True)
+    giveaways[guild_id]['message_id'] = msg.id
+    giveaways[guild_id]['channel_id'] = interaction.channel.id
+    
+    await interaction.followup.send("✅ Giveaway rozpoczęty! Czekam na uczestników...", ephemeral=True)
+
+@bot.tree.command(name="ticket", description="Weź udział w aktualnym giveaway")
+async def ticket(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    
+    # Sprawdź czy giveaway istnieje
+    if guild_id not in giveaways or not giveaways[guild_id]['active']:
+        await interaction.response.send_message("❌ Nie ma aktualnego giveaway!", ephemeral=True)
+        return
+    
+    # Sprawdź czy użytkownik już uczestniczy
+    if interaction.user.id in giveaways[guild_id]['users']:
+        await interaction.response.send_message("❌ Już jesteś w giveaway!", ephemeral=True)
+        return
+    
+    # Dodaj użytkownika
+    giveaways[guild_id]['users'].append(interaction.user.id)
+    await interaction.response.send_message(f"✅ Dołączyłeś do giveaway! Uczestników: {len(giveaways[guild_id]['users'])}", ephemeral=True)
+    
+    # Aktualizuj wiadomość z liczbą uczestników
+    try:
+        channel = bot.get_channel(giveaways[guild_id]['channel_id'])
+        message = await channel.fetch_message(giveaways[guild_id]['message_id'])
+        
+        embed = message.embeds[0]
+        embed.set_field_at(0, name="Uczestnicy", value=str(len(giveaways[guild_id]['users'])), inline=False)
+        await message.edit(embed=embed)
+    except:
+        pass
+
+@bot.tree.command(name="results", description="Wylosuj zwycięzcę giveaway")
+async def results(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    
+    # Sprawdź czy giveaway istnieje
+    if guild_id not in giveaways or not giveaways[guild_id]['active']:
+        await interaction.response.send_message("❌ Nie ma aktualnego giveaway!", ephemeral=True)
+        return
+    
+    users = giveaways[guild_id]['users']
+    
+    if not users:
+        await interaction.response.send_message("❌ Brak uczestników w giveaway!", ephemeral=True)
+        return
+    
+    import random
+    winner_id = random.choice(users)
+    winner = interaction.guild.get_member(winner_id)
+    
+    giveaways[guild_id]['active'] = False
+    
+    embed = discord.Embed(
+        title="🏆 ZWYCIĘZCA GIVEAWAY!",
+        description=f"Gratulacje {winner.mention}!",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="Liczba uczestników", value=str(len(users)), inline=True)
+    embed.add_field(name="Zwycięzca", value=winner.mention, inline=True)
+    
+    await interaction.response.send_message(embed=embed)
+    
+
 
 if __name__ == "__main__":
     if not TOKEN:
