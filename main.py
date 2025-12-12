@@ -84,6 +84,9 @@ FFMPEG_OPTIONS = {
 # Kolejka muzyki dla każdego serwera
 music_queues = {}
 
+# Giveaway system
+giveaways = {}
+
 class MusicQueue:
     def __init__(self):
         self.queue = []
@@ -265,6 +268,8 @@ async def on_ready():
     try:
         synced = await bot.tree.sync()
         print(f'Zsynchronizowano {len(synced)} komend')
+        for cmd in synced:
+            print(f'  ✓ {cmd.name}')
     except Exception as e:
         print(f'Błąd synchronizacji: {e}')
 
@@ -648,8 +653,6 @@ async def loop(interaction: discord.Interaction):
     except discord.errors.NotFound:
         pass  # Interaction wygasła, ale zapętlanie zostało zmienione
 
-# Giveaway system
-giveaways = {}  
 @bot.tree.command(name="giveaway", description="Zacznij giveaway - ludzie wpisują /ticket aby wziąć udział")
 async def giveaway(interaction: discord.Interaction):
     guild_id = interaction.guild.id
@@ -670,11 +673,10 @@ async def giveaway(interaction: discord.Interaction):
     embed.add_field(name="Uczestnicy", value="0", inline=False)
     embed.set_footer(text="Wpisz /ticket aby dołączyć")
     
-    msg = await interaction.response.send_message(embed=embed, fetch_reply=True)
+    await interaction.response.send_message(embed=embed)
+    msg = await interaction.original_response()
     giveaways[guild_id]['message_id'] = msg.id
     giveaways[guild_id]['channel_id'] = interaction.channel.id
-    
-    await interaction.followup.send("✅ Giveaway rozpoczęty! Czekam na uczestników...", ephemeral=True)
 
 @bot.tree.command(name="ticket", description="Weź udział w aktualnym giveaway")
 async def ticket(interaction: discord.Interaction):
