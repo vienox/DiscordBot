@@ -127,8 +127,8 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
         else:
             easing = 1.0  # Zatrzymane na końcu
         
-        # Obróć tak, żeby zatrzymało się na zwycięzcy (strzałka wskazuje PRAWO)
-        target_angle = 0 - (winner_index * angle_per_segment)  # 0 = prawo
+        # Obróć tak, żeby zatrzymało się na ŚRODKU segmentu zwycięzcy (strzałka wskazuje PRAWO)
+        target_angle = 0 - (winner_index * angle_per_segment) - (angle_per_segment / 2)  # 0 = prawo, -angle/2 = środek segmentu
         rotation = easing * (720 + target_angle)  # 2 pełne obroty + precyzyjne zatrzymanie
         
         # Rysuj segmenty koła
@@ -184,14 +184,12 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
             width=3
         )
         
-        # Jeśli to ostatnie klatki, wyświetl nazwę zwycięzcy na środku
         if frame_num >= spin_frames:
             try:
                 winner_font = ImageFont.truetype("arial.ttf", 16)
             except:
                 winner_font = ImageFont.load_default()
             
-            # Skróć nazwę jeśli za długa
             display_winner = winner_name[:12] + "..." if len(winner_name) > 12 else winner_name
             bbox = draw.textbbox((0, 0), display_winner, font=winner_font)
             text_width = bbox[2] - bbox[0]
@@ -204,15 +202,13 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
                 font=winner_font
             )
         
-        # Strzałka z prawej strony wskazująca DO ŚRODKA (ostry koniec w lewo)
         arrow_points = [
-            (center_x + radius + 10, center_y),  # Ostry koniec - wskazuje środek
-            (center_x + radius + 30, center_y - 20),  # Górny róg
-            (center_x + radius + 30, center_y + 20)   # Dolny róg
+            (center_x + radius + 10, center_y),  
+            (center_x + radius + 30, center_y - 20),  
+            (center_x + radius + 30, center_y + 20)
         ]
         draw.polygon(arrow_points, fill=(255, 0, 0))
         
-        # Dodaj tekst "SPINNING..." na początku, "WINNER!" po zakończeniu kręcenia
         status_text = "🎉 WINNER! 🎉" if frame_num >= spin_frames else "🎰 SPINNING..."
         try:
             title_font = ImageFont.truetype("arial.ttf", 24)
@@ -230,14 +226,13 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
         
         frames.append(img)
     
-    # Zapisz jako GIF
     output = io.BytesIO()
     frames[0].save(
         output,
         format='GIF',
         save_all=True,
         append_images=frames[1:],
-        duration=100,  # 100ms per frame
+        duration=100,  
         loop=0
     )
     output.seek(0)
@@ -291,7 +286,7 @@ async def get_spotify_track_info(track_id):
                 # Format: "Artist - Title"
                 title_parts = data.get('title', '').split(' · ')
                 if len(title_parts) >= 2:
-                    return f"{title_parts[1]} {title_parts[0]}"  # Artist Title
+                    return f"{title_parts[1]} {title_parts[0]}"  
                 return data.get('title', '')
     return None
 
@@ -319,7 +314,6 @@ async def get_spotify_playlist_info(playlist_id):
                 else:
                     html = await response.text()
         
-        # Prosta regex metoda - szukaj wszystkich par artist+title
         tracks = []
         
         # Pattern 1: JSON data w HTML
@@ -378,7 +372,6 @@ async def play_next(guild, text_channel=None):
                                 await text_channel.send(embed=embed)
                             except:
                                 pass
-                        # Przejdź do następnego utworu
                         await play_next(guild, text_channel)
                         return
                     
