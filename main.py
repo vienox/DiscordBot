@@ -17,7 +17,6 @@ import io
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Opcja: użyj cookies jeśli USE_COOKIES=true w .env
 USE_COOKIES = os.getenv('USE_COOKIES', 'false').lower() == 'true'
 
 if USE_COOKIES:
@@ -25,7 +24,6 @@ if USE_COOKIES:
 else:
     print("Cookies YouTube wyłączone")
 
-# Znajdź FFmpeg
 def find_ffmpeg():
     if shutil.which('ffmpeg'):
         return 'ffmpeg'
@@ -47,48 +45,42 @@ def find_ffmpeg():
         if os.path.exists(path):
             return path
     
-    return 'ffmpeg'  # fallback
+    return 'ffmpeg'
 
 FFMPEG_PATH = find_ffmpeg()
 print(f"Używam FFmpeg z: {FFMPEG_PATH}")
 
-# Konfiguracja intents
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Opcje dla yt-dlp
 YDL_OPTIONS = {
-    'format': 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',  # Najlepsza jakość audio
-    'noplaylist': False,  # Zezwól na playlisty
-    'extract_flat': 'in_playlist',  # Szybkie pobieranie playlist
+    'format': 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
+    'noplaylist': False,
+    'extract_flat': 'in_playlist',
     'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
     'ignoreerrors': True,
-    'postprocessors': [{  # Konwersja do najlepszej jakości
+    'postprocessors': [{
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'opus',
         'preferredquality': '320',
     }],
 }
 
-# Dodaj cookies tylko jeśli są włączone
 if USE_COOKIES:
     YDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn -b:a 320k -ar 48000 -ac 2'  # 320kbps bitrate, 48kHz sample rate, stereo
+    'options': '-vn -b:a 320k -ar 48000 -ac 2'
 }
 
-# Kolejka muzyki dla każdego serwera
 music_queues = {}
-
-# Giveaway system
 giveaways = {}
 
 def create_wheel_of_fortune_gif(usernames, winner_name):
@@ -108,38 +100,29 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
     frames = []
     num_users = len(usernames)
     angle_per_segment = 360 / num_users
-    
     winner_index = usernames.index(winner_name)
     
-    # 30 klatek animacji + 20 klatek na pokazanie zwycięzcy
     spin_frames = 30
-    hold_frames = 20  # Dodatkowe klatki na końcu
+    hold_frames = 20
     total_frames = spin_frames + hold_frames
     
     for frame_num in range(total_frames):
         img = Image.new('RGB', (width, height), color=(30, 30, 30))
         draw = ImageDraw.Draw(img)
         
-        # Oblicz rotację - zwalnia pod koniec
         if frame_num < spin_frames:
             progress = frame_num / spin_frames
-            easing = 1 - (1 - progress) ** 3  # Cubic ease-out
+            easing = 1 - (1 - progress) ** 3
         else:
-            easing = 1.0  # Zatrzymane na końcu
+            easing = 1.0
         
-        # Obróć tak, żeby zatrzymało się na ŚRODKU segmentu zwycięzcy (strzałka wskazuje PRAWO)
-        target_angle = 0 - (winner_index * angle_per_segment) - (angle_per_segment / 2)  # 0 = prawo, -angle/2 = środek segmentu
-        rotation = easing * (720 + target_angle)  # 2 pełne obroty + precyzyjne zatrzymanie
-        
-        # Rysuj segmenty koła
+        target_angle = 0 - (winner_index * angle_per_segment) - (angle_per_segment / 2)
+        rotation = easing * (720 + target_angle)
         for i, username in enumerate(usernames):
             start_angle = (i * angle_per_segment) + rotation
             end_angle = start_angle + angle_per_segment
-            
-            # Wybierz kolor
             color = colors[i % len(colors)]
             
-            # Rysuj segment
             draw.pieslice(
                 [center_x - radius, center_y - radius, center_x + radius, center_y + radius],
                 start=start_angle,
@@ -149,7 +132,6 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
                 width=3
             )
             
-            # Dodaj tekst (skrócony username jeśli za długi)
             text_angle = math.radians(start_angle + angle_per_segment / 2)
             text_radius = radius * 0.7
             text_x = center_x + text_radius * math.cos(text_angle)
@@ -162,7 +144,6 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
             except:
                 font = ImageFont.load_default()
             
-            # Obróć tekst w kierunku centrum
             bbox = draw.textbbox((0, 0), display_name, font=font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
@@ -174,7 +155,6 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
                 font=font
             )
         
-        # Rysuj środkowy okrąg
         inner_radius = 40
         draw.ellipse(
             [center_x - inner_radius, center_y - inner_radius,
@@ -283,7 +263,6 @@ async def get_spotify_track_info(track_id):
         async with session.get(url) as response:
             if response.status == 200:
                 data = await response.json()
-                # Format: "Artist - Title"
                 title_parts = data.get('title', '').split(' · ')
                 if len(title_parts) >= 2:
                     return f"{title_parts[1]} {title_parts[0]}"  
@@ -303,7 +282,6 @@ async def get_spotify_playlist_info(playlist_id):
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status == 404:
-                    # Spróbuj jako album
                     url = f"https://open.spotify.com/album/{playlist_id}"
                     async with session.get(url, headers=headers) as resp2:
                         if resp2.status != 200:
@@ -316,12 +294,11 @@ async def get_spotify_playlist_info(playlist_id):
         
         tracks = []
         
-        # Pattern 1: JSON data w HTML
         pattern1 = re.findall(r'"name":"([^"]{2,})"[^}]*"artists":\[{[^}]*"name":"([^"]{2,})"', html)
         for title, artist in pattern1:
             if title and artist and len(title) > 1 and len(artist) > 1:
                 track_str = f"{artist} {title}"
-                if track_str not in tracks:  # Usuń duplikaty
+                if track_str not in tracks:
                     tracks.append(track_str)
         
         if tracks:
@@ -348,7 +325,6 @@ async def play_next(guild, text_channel=None):
     queue = get_queue(guild.id)
     voice_client = discord.utils.get(bot.voice_clients, guild=guild)
     
-    # Jeśli nie przekazano kanału, spróbuj użyć zapisanego
     if not text_channel and hasattr(bot, 'text_channels'):
         text_channel = bot.text_channels.get(guild.id)
     
@@ -359,10 +335,8 @@ async def play_next(guild, text_channel=None):
                 with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                     info = ydl.extract_info(song['url'], download=False)
                     
-                    # Sprawdź czy film jest 18+
                     age_limit = info.get('age_limit', 0)
                     if age_limit >= 18:
-                        # Film 18+ - pomiń i wyświetl ostrzeżenie
                         if text_channel:
                             try:
                                 embed = discord.Embed(
@@ -384,7 +358,7 @@ async def play_next(guild, text_channel=None):
                     )
                 )
                 
-                # Wyślij wiadomość na czat o nowej piosence
+
                 if text_channel:
                     try:
                         embed = discord.Embed(
@@ -393,21 +367,18 @@ async def play_next(guild, text_channel=None):
                         )
                         await text_channel.send(embed=embed)
                     except:
-                        pass  # Ignoruj błędy wysyłania wiadomości
+                        pass
                         
             except Exception as e:
-                # Błąd pobierania - pomiń utwór
                 if text_channel:
                     try:
                         await text_channel.send(f"18+  {song['title'][:50]}... - szkip")
                     except:
                         pass
-                # Spróbuj następny utwór
                 await play_next(guild, text_channel)
                 return
         else:
-            # Kolejka pusta - czekaj 5 minut i rozłącz jeśli dalej nic nie gra
-            await asyncio.sleep(300)  # 5 minut
+            await asyncio.sleep(300)
             if voice_client and not voice_client.is_playing() and len(queue.queue) == 0:
                 await voice_client.disconnect()
 
@@ -424,7 +395,6 @@ async def on_ready():
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    # Jeżeli bot został przeniesiony do innego kanału głosowego, wyczyść stan jak po /leave
     if not bot.user or member.id != bot.user.id:
         return
     if before.channel and after.channel and before.channel != after.channel:
@@ -527,7 +497,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
     try:
         await interaction.response.defer()
     except discord.errors.NotFound:
-        # Timeout - ale kontynuuj operację
         pass
     
     if not interaction.user.voice:
@@ -541,7 +510,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
         channel = interaction.user.voice.channel
         await channel.connect()
     
-    # Zapisz kanał tekstowy dla powiadomień
     if not hasattr(bot, 'text_channels'):
         bot.text_channels = {}
     bot.text_channels[interaction.guild.id] = interaction.channel
@@ -549,7 +517,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
     queue = get_queue(interaction.guild.id)
     
     try:
-        # Sprawdź czy to link Spotify
         spotify_track_pattern = r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)'
         spotify_playlist_pattern = r'https?://open\.spotify\.com/(playlist|album)/([a-zA-Z0-9]+)'
         
@@ -559,7 +526,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
         search_queries = []
         
         if track_match:
-            # Pobierz informacje o utworze ze Spotify
             track_id = track_match.group(1)
             track_name = await get_spotify_track_info(track_id)
             if track_name:
@@ -570,7 +536,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 return
                 
         elif playlist_match:
-            # Scraping playlisty/albumu Spotify
             playlist_id = playlist_match.group(2)
             await interaction.followup.send("📥 Pobieram playlistę Spotify...")
             
@@ -582,7 +547,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 await interaction.followup.send("❌ Nie udało się pobrać playlisty Spotify")
                 return
         else:
-            # Normalny YouTube lub wyszukiwanie
             search_queries = [zapytanie]
         
         loop = asyncio.get_event_loop()
@@ -590,7 +554,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
         def extract_info(query):
             with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                 if not query.startswith('http'):
-                    query = f"ytsearch5:{query}"  # Szukaj 5 wyników i wybierz najlepszy
+                    query = f"ytsearch5:{query}"
                 return ydl.extract_info(query, download=False)
         
         added_count = 0
@@ -602,16 +566,12 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 info = await loop.run_in_executor(None, extract_info, search_query)
                 
                 if 'entries' in info:
-                    entries = [e for e in info.get('entries', []) if e]  # Filtruj puste
-                    
-                    # Sprawdź czy to wyszukiwanie czy playlista
+                    entries = [e for e in info.get('entries', []) if e]
                     if search_query.startswith('http') and ('playlist' in search_query or 'list=' in search_query):
-                        # To jest playlista YouTube - dodaj wszystkie utwory (max 50)
                         is_playlist = True
                         max_songs = 50
                         total_entries = len(entries)
                         
-                        # Wyślij info że ładujemy playlistę
                         if not track_match:
                             await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
                         
@@ -625,15 +585,13 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                             songs_added.append(song)
                             added_count += 1
                         
-                        # Jeśli playlist ma więcej niż max_songs
                         if total_entries > max_songs:
                             await interaction.followup.send(
                                 f"⚠️ Playlista ma {total_entries} utworów. Dodano tylko pierwsze {max_songs}."
                             )
                     else:
-                        # To jest wyszukiwanie - weź TYLKO pierwszy wynik
                         if entries:
-                            entry = entries[0]  # Najlepszy wynik
+                            entry = entries[0]
                             song = {
                                 'url': f"https://www.youtube.com/watch?v={entry.get('id') or entry.get('url')}",
                                 'title': entry.get('title', 'Nieznany tytuł'),
@@ -643,7 +601,6 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                             songs_added.append(song)
                             added_count += 1
                 else:
-                    # Pojedynczy utwór
                     song = {
                         'url': info.get('webpage_url') or info.get('url'),
                         'title': info.get('title', 'Nieznany tytuł'),
@@ -654,37 +611,31 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                     added_count += 1
                     
             except Exception as e:
-                # Jeśli problem z konkretnym utworem, poinformuj i kontynuuj
                 error_short = str(e)[:100]
                 print(f"Błąd dodawania: {e}")
-                if not is_playlist:  # Pokazuj błędy tylko dla pojedynczych utworów
+                if not is_playlist:
                     await interaction.followup.send(f"⚠️ Błąd: {error_short}")
                 continue
         
-        # Wyślij odpowiedź
         voice_client = interaction.guild.voice_client
         was_playing = voice_client.is_playing() or voice_client.is_paused()
         
         if added_count == 1 and not is_playlist:
             if was_playing:
-                # Coś już gra - tylko dodano do kolejki
                 await interaction.followup.send(f"✅ Dodano do kolejki: **{songs_added[0]['title']}**")
             else:
-                # Nic nie gra - zacznij grać (play_next wyświetli "Teraz gra")
                 await interaction.followup.send(f"✅ Dodano: **{songs_added[0]['title']}**")
         elif added_count > 1:
-            if not is_playlist or not track_match:  # Nie duplikuj wiadomości
+            if not is_playlist or not track_match:
                 await interaction.followup.send(f"✅ Dodano **{added_count}** utworów do kolejki")
         else:
             await interaction.followup.send("❌ Nie znaleziono utworu")
             return
         
-        # Jeśli nic nie gra, zacznij odtwarzać
         if not was_playing:
             await play_next(interaction.guild, interaction.channel)
                 
     except Exception as e:
-        # Pokaż pełny błąd dla debugowania
         error_msg = f"❌ Błąd: {str(e)}"
         if len(error_msg) > 2000:
             error_msg = error_msg[:1997] + "..."
@@ -701,7 +652,7 @@ async def pause(interaction: discord.Interaction):
         else:
             await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
     except discord.errors.NotFound:
-        pass  # Interaction wygasła, ale komenda zadziałała
+        pass
 
 @bot.tree.command(name="resume", description="Wznów odtwarzanie")
 async def resume(interaction: discord.Interaction):
@@ -713,7 +664,7 @@ async def resume(interaction: discord.Interaction):
         else:
             await interaction.response.send_message("❌ Odtwarzanie nie jest zatrzymane!", ephemeral=True)
     except discord.errors.NotFound:
-        pass  # Interaction wygasła, ale komenda zadziałała
+        pass
 
 @bot.tree.command(name="skip", description="Pomiń obecny utwór")
 async def skip(interaction: discord.Interaction):
@@ -722,14 +673,12 @@ async def skip(interaction: discord.Interaction):
         if voice_client and voice_client.is_playing():
             queue = get_queue(interaction.guild.id)
             
-            # Sprawdź co będzie dalej
             next_song = None
             if queue.loop and queue.current:
                 next_song = queue.current
             elif queue.queue:
                 next_song = queue.queue[0]
             
-            # Zapisz kanał tekstowy dla play_next
             guild_id = interaction.guild.id
             if not hasattr(bot, 'text_channels'):
                 bot.text_channels = {}
@@ -744,7 +693,6 @@ async def skip(interaction: discord.Interaction):
         else:
             await interaction.response.send_message("❌ Nic nie jest odtwarzane!", ephemeral=True)
     except discord.errors.NotFound:
-        # Interaction wygasła, ale utwór został pominięty
         if voice_client and voice_client.is_playing():
             voice_client.stop()
 
@@ -790,7 +738,7 @@ async def clear(interaction: discord.Interaction):
             voice_client.stop()
         await interaction.response.send_message("🗑️ Wyczyszczono kolejkę!")
     except discord.errors.NotFound:
-        pass  # Interaction wygasła, ale kolejka została wyczyszczona
+        pass
 
 @bot.tree.command(name="loop", description="Włącz/wyłącz zapętlanie obecnego utworu")
 async def loop(interaction: discord.Interaction):
@@ -800,18 +748,16 @@ async def loop(interaction: discord.Interaction):
         status = "włączono" if queue.loop else "wyłączono"
         await interaction.response.send_message(f"🔁 Zapętlanie {status}!")
     except discord.errors.NotFound:
-        pass  # Interaction wygasła, ale zapętlanie zostało zmienione
+        pass
 
 @bot.tree.command(name="giveaway", description="Zacznij giveaway - ludzie wpisują /ticket aby wziąć udział")
 async def giveaway(interaction: discord.Interaction):
     guild_id = interaction.guild.id
     
-    # Sprawdź czy giveaway już istnieje
     if guild_id in giveaways and giveaways[guild_id]['active']:
         await interaction.response.send_message("Losowanie już trwa! Użyj `/results` aby wylosować zwycięzcę.", ephemeral=True)
         return
     
-    # Stwórz nowy giveaway
     giveaways[guild_id] = {'users': [], 'active': True}
     
     embed = discord.Embed(
@@ -831,21 +777,16 @@ async def giveaway(interaction: discord.Interaction):
 async def ticket(interaction: discord.Interaction):
     guild_id = interaction.guild.id
     
-    # Sprawdź czy giveaway istnieje
     if guild_id not in giveaways or not giveaways[guild_id]['active']:
         await interaction.response.send_message("❌ Nie ma aktualnego giveaway!", ephemeral=True)
         return
     
-    # Sprawdź czy użytkownik już uczestniczy
     if interaction.user.id in giveaways[guild_id]['users']:
         await interaction.response.send_message("❌ Już jesteś w giveaway!", ephemeral=True)
         return
     
-    # Dodaj użytkownika
     giveaways[guild_id]['users'].append(interaction.user.id)
     await interaction.response.send_message(f"✅ Dołączyłeś do giveaway! Uczestników: {len(giveaways[guild_id]['users'])}", ephemeral=True)
-    
-    # Aktualizuj wiadomość z liczbą uczestników
     try:
         channel = bot.get_channel(giveaways[guild_id]['channel_id'])
         message = await channel.fetch_message(giveaways[guild_id]['message_id'])
@@ -876,14 +817,13 @@ async def results(interaction: discord.Interaction):
         if member:
             usernames.append(member.display_name)
     
-    # Losuj zwycięzcę
     winner_id = random.choice(users_ids)
     winner = interaction.guild.get_member(winner_id)
     winner_name = winner.display_name
     
     giveaways[guild_id]['active'] = False
     
-    await interaction.response.defer()  # Może to trochę potrwać
+    await interaction.response.defer()
     
     try:
         gif_bytes = await asyncio.to_thread(create_wheel_of_fortune_gif, usernames, winner_name)
@@ -899,7 +839,6 @@ async def results(interaction: discord.Interaction):
         
         await interaction.followup.send(embed=embed, file=file)
         
-        # Poczekaj 3 sekundy i pokaż zwycięzcę
         await asyncio.sleep(3)
         
         winner_embed = discord.Embed(
