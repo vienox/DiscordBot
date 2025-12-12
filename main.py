@@ -204,11 +204,11 @@ def create_wheel_of_fortune_gif(usernames, winner_name):
                 font=winner_font
             )
         
-        # Rysuj strzałkę wskazującą na PRAWO (zwycięzca) - obrócona o 180°
+        # Strzałka z prawej strony wskazująca DO ŚRODKA (ostry koniec w lewo)
         arrow_points = [
-            (center_x + radius + 30, center_y),  # Prawa strona
-            (center_x + radius + 10, center_y - 20),
-            (center_x + radius + 10, center_y + 20)
+            (center_x + radius + 10, center_y),  # Ostry koniec - wskazuje środek
+            (center_x + radius + 30, center_y - 20),  # Górny róg
+            (center_x + radius + 30, center_y + 20)   # Dolny róg
         ]
         draw.polygon(arrow_points, fill=(255, 0, 0))
         
@@ -898,13 +898,24 @@ async def results(interaction: discord.Interaction):
         
         embed = discord.Embed(
             title="🎰 KOŁO FORTUNY!",
-            description=f"🏆 **Zwycięzca: {winner_name}!**",
+            description="Losowanie zwycięzcy...",
             color=discord.Color.gold()
         )
         embed.add_field(name="Liczba uczestników", value=str(len(users_ids)), inline=True)
         embed.set_image(url="attachment://wheel_of_fortune.gif")
         
         await interaction.followup.send(embed=embed, file=file)
+        
+        # Poczekaj 3 sekundy i pokaż zwycięzcę
+        await asyncio.sleep(3)
+        
+        winner_embed = discord.Embed(
+            title="🏆 ZWYCIĘZCA!",
+            description=f"Gratulacje {winner.mention}!",
+            color=discord.Color.gold()
+        )
+        winner_embed.add_field(name="Zwycięzca", value=winner.mention, inline=True)
+        await interaction.followup.send(embed=winner_embed)
     except Exception as e:
         embed = discord.Embed(
             title="🏆 ZWYCIĘZCA GIVEAWAY!",
