@@ -9,6 +9,10 @@ import re
 import aiohttp
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from PIL import Image, ImageDraw, ImageFont
+import math
+import random
+import io
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -86,6 +90,158 @@ music_queues = {}
 
 # Giveaway system
 giveaways = {}
+
+def create_wheel_of_fortune_gif(usernames, winner_name):
+    """Generuje GIF koła fortuny z uczestnikami"""
+    width, height = 600, 600
+    center_x, center_y = width // 2, height // 2
+    radius = 250
+    
+    # Kolory dla każdego segmentu
+    colors = [
+        (255, 99, 71), (75, 192, 192), (255, 205, 86),
+        (54, 162, 235), (153, 102, 255), (255, 159, 64),
+        (199, 199, 199), (83, 102, 255), (255, 99, 132),
+        (75, 255, 192)
+    ]
+    
+    frames = []
+    num_users = len(usernames)
+    angle_per_segment = 360 / num_users
+    
+    winner_index = usernames.index(winner_name)
+    
+    # 30 klatek animacji + 20 klatek na pokazanie zwycięzcy
+    spin_frames = 30
+    hold_frames = 20  # Dodatkowe klatki na końcu
+    total_frames = spin_frames + hold_frames
+    
+    for frame_num in range(total_frames):
+        img = Image.new('RGB', (width, height), color=(30, 30, 30))
+        draw = ImageDraw.Draw(img)
+        
+        # Oblicz rotację - zwalnia pod koniec
+        if frame_num < spin_frames:
+            progress = frame_num / spin_frames
+            easing = 1 - (1 - progress) ** 3  # Cubic ease-out
+        else:
+            easing = 1.0  # Zatrzymane na końcu
+        
+        # Obróć tak, żeby zatrzymało się na zwycięzcy (strzałka wskazuje PRAWO)
+        target_angle = 0 - (winner_index * angle_per_segment)  # 0 = prawo
+        rotation = easing * (720 + target_angle)  # 2 pełne obroty + precyzyjne zatrzymanie
+        
+        # Rysuj segmenty koła
+        for i, username in enumerate(usernames):
+            start_angle = (i * angle_per_segment) + rotation
+            end_angle = start_angle + angle_per_segment
+            
+            # Wybierz kolor
+            color = colors[i % len(colors)]
+            
+            # Rysuj segment
+            draw.pieslice(
+                [center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                start=start_angle,
+                end=end_angle,
+                fill=color,
+                outline=(255, 255, 255),
+                width=3
+            )
+            
+            # Dodaj tekst (skrócony username jeśli za długi)
+            text_angle = math.radians(start_angle + angle_per_segment / 2)
+            text_radius = radius * 0.7
+            text_x = center_x + text_radius * math.cos(text_angle)
+            text_y = center_y + text_radius * math.sin(text_angle)
+            
+            display_name = username[:10] + "..." if len(username) > 10 else username
+            
+            try:
+                font = ImageFont.truetype("arial.ttf", 14)
+            except:
+                font = ImageFont.load_default()
+            
+            # Obróć tekst w kierunku centrum
+            bbox = draw.textbbox((0, 0), display_name, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            draw.text(
+                (text_x - text_width // 2, text_y - text_height // 2),
+                display_name,
+                fill=(255, 255, 255),
+                font=font
+            )
+        
+        # Rysuj środkowy okrąg
+        inner_radius = 40
+        draw.ellipse(
+            [center_x - inner_radius, center_y - inner_radius,
+             center_x + inner_radius, center_y + inner_radius],
+            fill=(255, 215, 0),
+            outline=(255, 255, 255),
+            width=3
+        )
+        
+        # Jeśli to ostatnie klatki, wyświetl nazwę zwycięzcy na środku
+        if frame_num >= spin_frames:
+            try:
+                winner_font = ImageFont.truetype("arial.ttf", 16)
+            except:
+                winner_font = ImageFont.load_default()
+            
+            # Skróć nazwę jeśli za długa
+            display_winner = winner_name[:12] + "..." if len(winner_name) > 12 else winner_name
+            bbox = draw.textbbox((0, 0), display_winner, font=winner_font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            draw.text(
+                (center_x - text_width // 2, center_y - text_height // 2),
+                display_winner,
+                fill=(0, 0, 0),
+                font=winner_font
+            )
+        
+        # Rysuj strzałkę wskazującą na PRAWO (zwycięzca) - obrócona o 180°
+        arrow_points = [
+            (center_x + radius + 30, center_y),  # Prawa strona
+            (center_x + radius + 10, center_y - 20),
+            (center_x + radius + 10, center_y + 20)
+        ]
+        draw.polygon(arrow_points, fill=(255, 0, 0))
+        
+        # Dodaj tekst "SPINNING..." na początku, "WINNER!" po zakończeniu kręcenia
+        status_text = "🎉 WINNER! 🎉" if frame_num >= spin_frames else "🎰 SPINNING..."
+        try:
+            title_font = ImageFont.truetype("arial.ttf", 24)
+        except:
+            title_font = ImageFont.load_default()
+        
+        bbox = draw.textbbox((0, 0), status_text, font=title_font)
+        text_width = bbox[2] - bbox[0]
+        draw.text(
+            ((width - text_width) // 2, 20),
+            status_text,
+            fill=(255, 255, 255),
+            font=title_font
+        )
+        
+        frames.append(img)
+    
+    # Zapisz jako GIF
+    output = io.BytesIO()
+    frames[0].save(
+        output,
+        format='GIF',
+        save_all=True,
+        append_images=frames[1:],
+        duration=100,  # 100ms per frame
+        loop=0
+    )
+    output.seek(0)
+    return output
 
 class MusicQueue:
     def __init__(self):
@@ -659,7 +815,7 @@ async def giveaway(interaction: discord.Interaction):
     
     # Sprawdź czy giveaway już istnieje
     if guild_id in giveaways and giveaways[guild_id]['active']:
-        await interaction.response.send_message("❌ Giveaway już trwa! Użyj `/results` aby wylosować zwycięzcę.", ephemeral=True)
+        await interaction.response.send_message("Losowanie już trwa! Użyj `/results` aby wylosować zwycięzcę.", ephemeral=True)
         return
     
     # Stwórz nowy giveaway
@@ -711,32 +867,54 @@ async def ticket(interaction: discord.Interaction):
 async def results(interaction: discord.Interaction):
     guild_id = interaction.guild.id
     
-    # Sprawdź czy giveaway istnieje
     if guild_id not in giveaways or not giveaways[guild_id]['active']:
         await interaction.response.send_message("❌ Nie ma aktualnego giveaway!", ephemeral=True)
         return
     
-    users = giveaways[guild_id]['users']
+    users_ids = giveaways[guild_id]['users']
     
-    if not users:
+    if not users_ids:
         await interaction.response.send_message("❌ Brak uczestników w giveaway!", ephemeral=True)
         return
     
-    import random
-    winner_id = random.choice(users)
+    usernames = []
+    for user_id in users_ids:
+        member = interaction.guild.get_member(user_id)
+        if member:
+            usernames.append(member.display_name)
+    
+    # Losuj zwycięzcę
+    winner_id = random.choice(users_ids)
     winner = interaction.guild.get_member(winner_id)
+    winner_name = winner.display_name
     
     giveaways[guild_id]['active'] = False
     
-    embed = discord.Embed(
-        title="🏆 ZWYCIĘZCA GIVEAWAY!",
-        description=f"Gratulacje {winner.mention}!",
-        color=discord.Color.gold()
-    )
-    embed.add_field(name="Liczba uczestników", value=str(len(users)), inline=True)
-    embed.add_field(name="Zwycięzca", value=winner.mention, inline=True)
+    await interaction.response.defer()  # Może to trochę potrwać
     
-    await interaction.response.send_message(embed=embed)
+    try:
+        gif_bytes = await asyncio.to_thread(create_wheel_of_fortune_gif, usernames, winner_name)
+        file = discord.File(gif_bytes, filename="wheel_of_fortune.gif")
+        
+        embed = discord.Embed(
+            title="🎰 KOŁO FORTUNY!",
+            description=f"🏆 **Zwycięzca: {winner_name}!**",
+            color=discord.Color.gold()
+        )
+        embed.add_field(name="Liczba uczestników", value=str(len(users_ids)), inline=True)
+        embed.set_image(url="attachment://wheel_of_fortune.gif")
+        
+        await interaction.followup.send(embed=embed, file=file)
+    except Exception as e:
+        embed = discord.Embed(
+            title="🏆 ZWYCIĘZCA GIVEAWAY!",
+            description=f"Gratulacje {winner.mention}!",
+            color=discord.Color.gold()
+        )
+        embed.add_field(name="Liczba uczestników", value=str(len(users_ids)), inline=True)
+        embed.add_field(name="Zwycięzca", value=winner.mention, inline=True)
+        await interaction.followup.send(embed=embed)
+        print(f"Błąd generowania GIF: {e}")
     
 
 
