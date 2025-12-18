@@ -13,9 +13,13 @@ from PIL import Image, ImageDraw, ImageFont
 import math
 import random
 import io
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 
 USE_COOKIES = os.getenv('USE_COOKIES', 'false').lower() == 'true'
 
@@ -270,61 +274,65 @@ async def get_spotify_track_info(track_id):
     return None
 
 async def get_spotify_playlist_info(playlist_id):
-    """Pobierz utwory z playlisty/albumu Spotify przez scraping"""
+    """Pobierz 25 utworów z playlisty/albumu Spotify przez API"""
     try:
-        # Spróbuj jako playlist
-        url = f"https://open.spotify.com/playlist/{playlist_id}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        }
+        if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+            print("Spotify: Brak kluczy API w .env")
+            return None
         
-        timeout = aiohttp.ClientTimeout(total=10)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, headers=headers) as response:
-                if response.status == 404:
-                    url = f"https://open.spotify.com/album/{playlist_id}"
-                    async with session.get(url, headers=headers) as resp2:
-                        if resp2.status != 200:
-                            return None
-                        html = await resp2.text()
-                elif response.status != 200:
-                    return None
-                else:
-                    html = await response.text()
+        if SPOTIFY_CLIENT_ID == 'twoj_client_id':
+            print("Spotify: Ustaw prawdziwe klucze API w .env")
+            return None
+        
+        # Inicjalizuj Spotify client
+        auth_manager = SpotifyClientCredentials(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET
+        )
+        sp = spotipy.Spotify(auth_manager=auth_manager)
         
         tracks = []
         
-        patterns = [
-            r'"track":\s*{[^}]*"name":"([^"]+)"[^}]*"artists":\s*\[\s*{[^}]*"name":"([^"]+)"',
-            r'"name":"([^"]{2,})"[^}]*"artists":\[{[^}]*"name":"([^"]{2,})"',
-            r'<meta\s+property="music:song"\s+content="[^"]*track/([^"]+)"[^>]*>.*?<meta\s+property="og:title"\s+content="([^"]+)"',
-        ]
+        # Spróbuj jako playlist
+        try:
+            results = sp.playlist_tracks(playlist_id, limit=25)
+            items = results['items']
+            
+            for item in items:
+                track = item.get('track')
+                if track:
+                    artists = ', '.join([artist['name'] for artist in track['artists']])
+                    title = track['name']
+                    track_str = f"{artists} {title}"
+                    tracks.append(track_str)
+            
+            if tracks:
+                print(f"Spotify Playlist: Znaleziono {len(tracks)} utworów")
+                return tracks[:25]
         
-        for pattern in patterns:
-            matches = re.findall(pattern, html, re.DOTALL)
-            if matches:
-                for match in matches:
-                    if len(match) >= 2:
-                        title, artist = match[0], match[1]
-                        if title and artist and len(title) > 1 and len(artist) > 1:
-                            track_str = f"{artist} {title}"
-                            if track_str not in tracks:
-                                tracks.append(track_str)
+        except:
+            # Spróbuj jako album
+            try:
+                results = sp.album_tracks(playlist_id, limit=25)
+                items = results['items']
+                
+                for track in items:
+                    artists = ', '.join([artist['name'] for artist in track['artists']])
+                    title = track['name']
+                    track_str = f"{artists} {title}"
+                    tracks.append(track_str)
+                
                 if tracks:
-                    break
+                    print(f"Spotify Album: Znaleziono {len(tracks)} utworów")
+                    return tracks[:25]
+            except:
+                pass
         
-        if tracks:
-            print(f"Spotify: Znaleziono {len(tracks)} utworów")
-            return tracks[:50]
-        
-        print("Spotify: Nie znaleziono utworów - HTML może się zmienił")
+        print("Spotify: Nie znaleziono playlisty/albumu")
         return None
         
-    except asyncio.TimeoutError:
-        print("Spotify: Timeout")
-        return None
     except Exception as e:
-        print(f"Błąd Spotify: {e}")
+        print(f"Błąd Spotify API: {e}")
         return None
 
 async def play_next(guild, text_channel=None):
