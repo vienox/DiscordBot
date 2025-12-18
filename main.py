@@ -8,7 +8,7 @@ import shutil
 import re
 import aiohttp
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 from PIL import Image, ImageDraw, ImageFont
 import math
 import random
@@ -16,10 +16,19 @@ import io
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
-SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+# Wczytaj wartości bezpośrednio z pliku .env (ignoruj zmienne systemowe)
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+env_values = dotenv_values(env_path)
+
+print(f"DEBUG: env_values = {env_values}")
+
+TOKEN = env_values.get('DISCORD_TOKEN') or os.getenv('DISCORD_TOKEN')
+SPOTIFY_CLIENT_ID = env_values.get('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = env_values.get('SPOTIFY_CLIENT_SECRET')
+
+print(f"Ścieżka .env: {env_path}")
+print(f"Spotify Client ID: {SPOTIFY_CLIENT_ID}")
+print(f"Spotify Client Secret: {SPOTIFY_CLIENT_SECRET[:10] if SPOTIFY_CLIENT_SECRET else None}...")
 
 USE_COOKIES = os.getenv('USE_COOKIES', 'false').lower() == 'true'
 
@@ -276,6 +285,9 @@ async def get_spotify_track_info(track_id):
 async def get_spotify_playlist_info(playlist_id):
     """Pobierz 25 utworów z playlisty/albumu Spotify przez API"""
     try:
+        print(f"DEBUG: SPOTIFY_CLIENT_ID = {SPOTIFY_CLIENT_ID}")
+        print(f"DEBUG: SPOTIFY_CLIENT_SECRET = {SPOTIFY_CLIENT_SECRET[:10] if SPOTIFY_CLIENT_SECRET else None}...")
+        
         if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
             print("Spotify: Brak kluczy API w .env")
             return None
