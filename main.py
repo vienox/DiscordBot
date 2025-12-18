@@ -294,18 +294,30 @@ async def get_spotify_playlist_info(playlist_id):
         
         tracks = []
         
-        pattern1 = re.findall(r'"name":"([^"]{2,})"[^}]*"artists":\[{[^}]*"name":"([^"]{2,})"', html)
-        for title, artist in pattern1:
-            if title and artist and len(title) > 1 and len(artist) > 1:
-                track_str = f"{artist} {title}"
-                if track_str not in tracks:
-                    tracks.append(track_str)
+        patterns = [
+            r'"track":\s*{[^}]*"name":"([^"]+)"[^}]*"artists":\s*\[\s*{[^}]*"name":"([^"]+)"',
+            r'"name":"([^"]{2,})"[^}]*"artists":\[{[^}]*"name":"([^"]{2,})"',
+            r'<meta\s+property="music:song"\s+content="[^"]*track/([^"]+)"[^>]*>.*?<meta\s+property="og:title"\s+content="([^"]+)"',
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, html, re.DOTALL)
+            if matches:
+                for match in matches:
+                    if len(match) >= 2:
+                        title, artist = match[0], match[1]
+                        if title and artist and len(title) > 1 and len(artist) > 1:
+                            track_str = f"{artist} {title}"
+                            if track_str not in tracks:
+                                tracks.append(track_str)
+                if tracks:
+                    break
         
         if tracks:
             print(f"Spotify: Znaleziono {len(tracks)} utworów")
             return tracks[:50]
         
-        print("Spotify: Nie znaleziono utworów")
+        print("Spotify: Nie znaleziono utworów - HTML może się zmienił")
         return None
         
     except asyncio.TimeoutError:
@@ -313,12 +325,6 @@ async def get_spotify_playlist_info(playlist_id):
         return None
     except Exception as e:
         print(f"Błąd Spotify: {e}")
-        return None
-        
-        return None
-        
-    except Exception as e:
-        print(f"Błąd scraping: {e}")
         return None
 
 async def play_next(guild, text_channel=None):
