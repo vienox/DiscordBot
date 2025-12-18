@@ -364,11 +364,16 @@ async def play_next(guild, text_channel=None):
                     
                     url = info['url']
                     
-                voice_client.play(
-                    discord.FFmpegPCMAudio(url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS),
-                    after=lambda e: asyncio.run_coroutine_threadsafe(
+                def after_playing(error):
+                    if error:
+                        print(f"Player error: {error}")
+                    asyncio.run_coroutine_threadsafe(
                         play_next(guild, text_channel), bot.loop
                     )
+                
+                voice_client.play(
+                    discord.FFmpegPCMAudio(url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS),
+                    after=after_playing
                 )
                 
 
@@ -573,6 +578,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
         added_count = 0
         songs_added = []
         is_playlist = False
+        is_spotify_playlist = len(search_queries) > 1 and (track_match or playlist_match)
         
         for search_query in search_queries:
             try:
@@ -585,8 +591,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                         max_songs = 50
                         total_entries = len(entries)
                         
-                        if not track_match:
-                            await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
+                        await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
                         
                         for entry in entries[:max_songs]:  
                             song = {
@@ -633,13 +638,13 @@ async def play(interaction: discord.Interaction, zapytanie: str):
         voice_client = interaction.guild.voice_client
         was_playing = voice_client.is_playing() or voice_client.is_paused()
         
-        if added_count == 1 and not is_playlist:
+        if added_count == 1 and not is_spotify_playlist:
             if was_playing:
                 await interaction.followup.send(f"✅ Dodano do kolejki: **{songs_added[0]['title']}**")
             else:
                 await interaction.followup.send(f"✅ Dodano: **{songs_added[0]['title']}**")
         elif added_count > 1:
-            if not is_playlist or not track_match:
+            if not is_playlist:
                 await interaction.followup.send(f"✅ Dodano **{added_count}** utworów do kolejki")
         else:
             await interaction.followup.send("❌ Nie znaleziono utworu")
