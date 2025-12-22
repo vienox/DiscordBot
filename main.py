@@ -16,7 +16,6 @@ import io
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 
-# Wczytaj wartości bezpośrednio z pliku .env (ignoruj zmienne systemowe)
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 env_values = dotenv_values(env_path)
 
@@ -91,12 +90,10 @@ music_queues = {}
 giveaways = {}
 
 def create_wheel_of_fortune_gif(usernames, winner_name):
-    """Generuje GIF koła fortuny z uczestnikami"""
     width, height = 600, 600
     center_x, center_y = width // 2, height // 2
     radius = 250
     
-    # Kolory dla każdego segmentu
     colors = [
         (255, 99, 71), (75, 192, 192), (255, 205, 86),
         (54, 162, 235), (153, 102, 255), (255, 159, 64),
@@ -252,7 +249,6 @@ def get_queue(guild_id):
     return music_queues[guild_id]
 
 async def cleanup_guild_state(guild):
-    """Rozlacz bota i usun stan kolejki oraz zapamietane kanaly tekstowe dla serwera."""
     guild_id = guild.id
     queue = music_queues.pop(guild_id, None)
     if queue:
@@ -264,7 +260,6 @@ async def cleanup_guild_state(guild):
         await voice_client.disconnect(force=True)
 
 async def get_spotify_track_info(track_id):
-    """Pobierz informacje o utworze ze Spotify (bez autoryzacji)"""
     url = f"https://open.spotify.com/oembed?url=spotify:track:{track_id}"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
@@ -277,24 +272,36 @@ async def get_spotify_track_info(track_id):
     return None
 
 async def get_spotify_playlist_info(playlist_id):
-    """Pobierz 25 utworów z playlisty/albumu Spotify przez API"""
+    print(f"DEBUG: get_spotify_playlist_info wywołana z ID: {playlist_id}")
     try:
         if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
             print("Spotify: Brak kluczy API w .env")
+            print(f"DEBUG: CLIENT_ID={'SET' if SPOTIFY_CLIENT_ID else 'NOT SET'}, CLIENT_SECRET={'SET' if SPOTIFY_CLIENT_SECRET else 'NOT SET'}")
             return None
         
-        # Inicjalizuj Spotify client
         auth_manager = SpotifyClientCredentials(
             client_id=SPOTIFY_CLIENT_ID,
             client_secret=SPOTIFY_CLIENT_SECRET
         )
         sp = spotipy.Spotify(auth_manager=auth_manager)
         
+        try:
+            token_info = auth_manager.get_access_token(as_dict=False)
+            print(f"DEBUG: Token Spotify otrzymany pomyślnie (długość: {len(token_info) if token_info else 0})")
+        except Exception as auth_error:
+            print(f"DEBUG: Błąd autentykacji Spotify: {auth_error}")
+            return None
+        
+        try:
+            test_search = sp.search(q='test', limit=1, type='track')
+            print(f"DEBUG: Test wyszukiwania Spotify - działa!")
+        except Exception as search_error:
+            print(f"DEBUG: Test wyszukiwania nie działa: {search_error}")
+        
         tracks = []
         
-        # Spróbuj jako playlist
         try:
-            results = sp.playlist_tracks(playlist_id, limit=25)
+            results = sp.playlist_tracks(playlist_id, limit=25, market='PL')
             items = results['items']
             
             for item in items:
@@ -309,10 +316,13 @@ async def get_spotify_playlist_info(playlist_id):
                 print(f"Spotify Playlist: Znaleziono {len(tracks)} utworów")
                 return tracks[:25]
         
-        except:
-            # Spróbuj jako album
+        except Exception as e:
+            if hasattr(e, 'http_status') and e.http_status == 404:
+                print(f"Spotify: Playlist nie istnieje (404): {playlist_id}")
+                return None
+            
             try:
-                results = sp.album_tracks(playlist_id, limit=25)
+                results = sp.album_tracks(playlist_id, limit=25, market='PL')
                 items = results['items']
                 
                 for track in items:
@@ -324,10 +334,14 @@ async def get_spotify_playlist_info(playlist_id):
                 if tracks:
                     print(f"Spotify Album: Znaleziono {len(tracks)} utworów")
                     return tracks[:25]
-            except:
-                pass
+            except Exception as album_error:
+                if hasattr(album_error, 'http_status') and album_error.http_status == 404:
+                    print(f"Spotify: Nie znaleziono playlisty/albumu (404): {playlist_id}")
+                else:
+                    print(f"Spotify Album Error: {album_error}")
+                return None
         
-        print("Spotify: Nie znaleziono playlisty/albumu")
+        print("Spotify: Nie znaleziono utworów w playliście/albumie")
         return None
         
     except Exception as e:
@@ -375,7 +389,6 @@ async def play_next(guild, text_channel=None):
                     discord.FFmpegPCMAudio(url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS),
                     after=after_playing
                 )
-                
 
                 if text_channel:
                     try:
@@ -555,6 +568,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 
         elif playlist_match:
             playlist_id = playlist_match.group(2)
+            print(f"DEBUG: Wykryto Spotify playlist/album, ID: {playlist_id}")
             await interaction.followup.send("📥 Pobieram playlistę Spotify...")
             
             tracks = await get_spotify_playlist_info(playlist_id)
@@ -593,7 +607,7 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                         
                         await interaction.followup.send(f"📥 Ładuję playlistę: {total_entries} utworów...")
                         
-                        for entry in entries[:max_songs]:  
+                        for entry in entries[:max_songs]:
                             song = {
                                 'url': f"https://www.youtube.com/watch?v={entry.get('id') or entry.get('url')}",
                                 'title': entry.get('title', 'Nieznany tytuł'),
@@ -876,8 +890,6 @@ async def results(interaction: discord.Interaction):
         embed.add_field(name="Zwycięzca", value=winner.mention, inline=True)
         await interaction.followup.send(embed=embed)
         print(f"Błąd generowania GIF: {e}")
-    
-
 
 if __name__ == "__main__":
     if not TOKEN:
