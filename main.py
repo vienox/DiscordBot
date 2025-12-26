@@ -1040,7 +1040,6 @@ def select_random_fish():
         if rand <= current:
             return fish_name, fish_data
     
-    # Fallback - zwróć ostatnią rybę
     return list(FISH_SPECIES.items())[-1]
 
 @bot.tree.command(name="lowrybe", description="Rzuć wędkę i złap rybę!")
@@ -1147,14 +1146,18 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
     )
     embed.add_field(name="📊 Statystyki rzadkości", value=rarity_text, inline=False)
     
-    # Pokaż 10 ostatnich złowionych ryb
-    recent_catches = catches[-10:][::-1]  # Ostatnie 10, od najnowszych
-    recent_text = ""
-    for i, catch in enumerate(recent_catches, 1):
-        recent_text += f"{i}. {catch['fish']} - *{catch['rarity']}* ({catch['timestamp']}\n"
+    # Sortuj ryby od najrzadszych do najpospolitszych
+    rarity_order = {"Legendarny": 0, "Epicki": 1, "Rzadki": 2, "Pospolity": 3}
+    sorted_catches = sorted(catches, key=lambda x: rarity_order.get(x["rarity"], 4))
     
-    if recent_text:
-        embed.add_field(name="🕐 Ostatnie złowione (max 10)", value=recent_text, inline=False)
+    # Pokaż 10 najrzadszych złowionych ryb
+    rare_catches = sorted_catches[:10]  # Pierwsze 10 (najrzadsze)
+    rare_text = ""
+    for i, catch in enumerate(rare_catches, 1):
+        rare_text += f"{i}. {catch['fish']} - *{catch['rarity']}* ({catch['timestamp']})\n"
+    
+    if rare_text:
+        embed.add_field(name="🌟 Najrzadsze złowione (max 10)", value=rare_text, inline=False)
     
     # Pokaż najrzadsze złowione ryby
     legendary_fish = [c["fish"] for c in catches if c["rarity"] == "Legendarny"]

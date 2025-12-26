@@ -104,6 +104,9 @@ htmlcov/
 *.sqlite
 *.sqlite3
 
+# Fishing data - user catches
+fishing_catches.json
+
 # Backup files
 *.bak
 *.backup
