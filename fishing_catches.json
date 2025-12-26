@@ -1,0 +1,152 @@
+{
+  "334699245359726594": [
+    {
+      "fish": "🐟 Różanka",
+      "rarity": "Pospolity",
+      "chance": 12.4,
+      "timestamp": "2025-12-26 20:20:28"
+    },
+    {
+      "fish": "🐚 Małż",
+      "rarity": "Pospolity",
+      "chance": 13.0,
+      "timestamp": "2025-12-26 20:20:51"
+    },
+    {
+      "fish": "🐠 Konik Morski",
+      "rarity": "Pospolity",
+      "chance": 6.5,
+      "timestamp": "2025-12-26 20:21:05"
+    },
+    {
+      "fish": "🐟 Zimnica",
+      "rarity": "Pospolity",
+      "chance": 8.3,
+      "timestamp": "2025-12-26 20:21:19"
+    },
+    {
+      "fish": "🐟 Troć",
+      "rarity": "Pospolity",
+      "chance": 7.7,
+      "timestamp": "2025-12-26 20:21:28"
+    },
+    {
+      "fish": "🐟 Troć",
+      "rarity": "Pospolity",
+      "chance": 7.7,
+      "timestamp": "2025-12-26 20:21:43"
+    },
+    {
+      "fish": "🐟 Turbot",
+      "rarity": "Pospolity",
+      "chance": 7.8,
+      "timestamp": "2025-12-26 20:21:58"
+    },
+    {
+      "fish": "🐟 Szprot",
+      "rarity": "Pospolity",
+      "chance": 9.4,
+      "timestamp": "2025-12-26 20:22:18"
+    }
+  ],
+  "334699282785501205": [
+    {
+      "fish": "🐟 Jelec",
+      "rarity": "Pospolity",
+      "chance": 6.4,
+      "timestamp": "2025-12-26 20:20:49"
+    },
+    {
+      "fish": "🐟 Świnka",
+      "rarity": "Pospolity",
+      "chance": 13.2,
+      "timestamp": "2025-12-26 20:21:11"
+    },
+    {
+      "fish": "🐟 Koza",
+      "rarity": "Pospolity",
+      "chance": 14.6,
+      "timestamp": "2025-12-26 20:21:29"
+    },
+    {
+      "fish": "🐟 Szczupak",
+      "rarity": "Pospolity",
+      "chance": 8.0,
+      "timestamp": "2025-12-26 20:21:39"
+    },
+    {
+      "fish": "🐟 Pstrąg Tęczowy",
+      "rarity": "Rzadki",
+      "chance": 2.5,
+      "timestamp": "2025-12-26 20:22:21"
+    },
+    {
+      "fish": "🐚 Małż",
+      "rarity": "Pospolity",
+      "chance": 13.0,
+      "timestamp": "2025-12-26 20:22:31"
+    },
+    {
+      "fish": "🦞 Rak",
+      "rarity": "Pospolity",
+      "chance": 12.0,
+      "timestamp": "2025-12-26 20:22:38"
+    },
+    {
+      "fish": "🐟 Śledź",
+      "rarity": "Pospolity",
+      "chance": 10.5,
+      "timestamp": "2025-12-26 20:23:07"
+    }
+  ],
+  "500368740446371860": [
+    {
+      "fish": "🐟 Czebaczek",
+      "rarity": "Pospolity",
+      "chance": 10.8,
+      "timestamp": "2025-12-26 20:21:05"
+    },
+    {
+      "fish": "🐡 Ryba Kula",
+      "rarity": "Pospolity",
+      "chance": 8.5,
+      "timestamp": "2025-12-26 20:21:23"
+    },
+    {
+      "fish": "🐟 Lipień",
+      "rarity": "Pospolity",
+      "chance": 11.6,
+      "timestamp": "2025-12-26 20:21:37"
+    },
+    {
+      "fish": "🐟 Okoń",
+      "rarity": "Pospolity",
+      "chance": 7.0,
+      "timestamp": "2025-12-26 20:21:48"
+    },
+    {
+      "fish": "🐟 Brzana",
+      "rarity": "Pospolity",
+      "chance": 10.4,
+      "timestamp": "2025-12-26 20:22:04"
+    },
+    {
+      "fish": "🐟 Śliz",
+      "rarity": "Pospolity",
+      "chance": 12.8,
+      "timestamp": "2025-12-26 20:22:19"
+    },
+    {
+      "fish": "🐟 Amur Biały",
+      "rarity": "Pospolity",
+      "chance": 13.8,
+      "timestamp": "2025-12-26 20:22:35"
+    },
+    {
+      "fish": "🐟 Miętus Morski",
+      "rarity": "Pospolity",
+      "chance": 14.8,
+      "timestamp": "2025-12-26 20:23:02"
+    }
+  ]
+}

@@ -15,6 +15,8 @@ import random
 import io
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+import json
+from datetime import datetime
 
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 env_values = dotenv_values(env_path)
@@ -893,6 +895,27 @@ async def results(interaction: discord.Interaction):
 
 # System łowienia ryb
 fishing_active = {}
+user_catches = {}  # Słownik przechowujący złowione ryby użytkowników
+CATCHES_FILE = 'fishing_catches.json'
+
+def load_catches():
+    """Wczytuje zapisane złowione ryby z pliku"""
+    global user_catches
+    try:
+        if os.path.exists(CATCHES_FILE):
+            with open(CATCHES_FILE, 'r', encoding='utf-8') as f:
+                user_catches = json.load(f)
+    except Exception as e:
+        print(f"Błąd wczytywania złowionych ryb: {e}")
+        user_catches = {}
+
+def save_catches():
+    """Zapisuje złowione ryby do pliku"""
+    try:
+        with open(CATCHES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(user_catches, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Błąd zapisywania złowionych ryb: {e}")
 
 FISH_SPECIES = {
     # Bardzo rzadkie (0.01% - 0.5%)
@@ -1045,6 +1068,20 @@ async def lowrybe(interaction: discord.Interaction):
     # Losuj rybę
     fish_name, fish_data = select_random_fish()
     
+    # Zapisz złowioną rybę
+    user_id_str = str(user_id)
+    if user_id_str not in user_catches:
+        user_catches[user_id_str] = []
+    
+    catch_data = {
+        "fish": fish_name,
+        "rarity": fish_data["rarity"],
+        "chance": fish_data["chance"],
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    user_catches[user_id_str].append(catch_data)
+    save_catches()
+    
     # Stwórz embed z wynikiem
     result_embed = discord.Embed(
         title="🎣 Złapałeś rybę!",
@@ -1054,6 +1091,7 @@ async def lowrybe(interaction: discord.Interaction):
     result_embed.add_field(name="Rzadkość", value=fish_data["rarity"], inline=True)
     result_embed.add_field(name="Szansa", value=f"{fish_data['chance']}%", inline=True)
     result_embed.add_field(name="Czas łowienia", value=f"{wait_time} sekund", inline=True)
+    result_embed.add_field(name="Łącznie złowionych", value=f"{len(user_catches[user_id_str])} ryb", inline=False)
     
     if fish_data["rarity"] == "Legendarny":
         result_embed.set_footer(text="🌟 GRATULACJE! Złapałeś legendarną rybę! 🌟")
@@ -1062,9 +1100,80 @@ async def lowrybe(interaction: discord.Interaction):
     
     fishing_active[user_id] = False
 
+@bot.tree.command(name="zlowione", description="Zobacz wszystkie złowione ryby")
+async def zlowione(interaction: discord.Interaction, user: discord.User = None):
+    target_user = user if user else interaction.user
+    user_id_str = str(target_user.id)
+    
+    if user_id_str not in user_catches or not user_catches[user_id_str]:
+        await interaction.response.send_message(
+            f"🎣 {target_user.mention} jeszcze nie złowił żadnej ryby! Użyj `/lowrybe` aby zacząć łowić.",
+            ephemeral=True
+        )
+        return
+    
+    catches = user_catches[user_id_str]
+    total_catches = len(catches)
+    
+    # Zlicz ryby według rzadkości
+    rarity_counts = {
+        "Legendarny": 0,
+        "Epicki": 0,
+        "Rzadki": 0,
+        "Pospolity": 0
+    }
+    
+    # Zlicz każdy gatunek
+    fish_counts = {}
+    for catch in catches:
+        fish_name = catch["fish"]
+        rarity = catch["rarity"]
+        rarity_counts[rarity] += 1
+        fish_counts[fish_name] = fish_counts.get(fish_name, 0) + 1
+    
+    # Stwórz embed z statystykami
+    embed = discord.Embed(
+        title=f"🎣 Złowione ryby - {target_user.display_name}",
+        description=f"Łącznie złowionych: **{total_catches}** ryb",
+        color=0x3498DB
+    )
+    
+    # Dodaj statystyki rzadkości
+    rarity_text = (
+        f"🔴 Legendarnych: **{rarity_counts['Legendarny']}**\n"
+        f"🟣 Epickich: **{rarity_counts['Epicki']}**\n"
+        f"🔵 Rzadkich: **{rarity_counts['Rzadki']}**\n"
+        f"🟢 Pospolitych: **{rarity_counts['Pospolity']}**"
+    )
+    embed.add_field(name="📊 Statystyki rzadkości", value=rarity_text, inline=False)
+    
+    # Pokaż 10 ostatnich złowionych ryb
+    recent_catches = catches[-10:][::-1]  # Ostatnie 10, od najnowszych
+    recent_text = ""
+    for i, catch in enumerate(recent_catches, 1):
+        recent_text += f"{i}. {catch['fish']} - *{catch['rarity']}* ({catch['timestamp']}\n"
+    
+    if recent_text:
+        embed.add_field(name="🕐 Ostatnie złowione (max 10)", value=recent_text, inline=False)
+    
+    # Pokaż najrzadsze złowione ryby
+    legendary_fish = [c["fish"] for c in catches if c["rarity"] == "Legendarny"]
+    if legendary_fish:
+        unique_legendary = list(set(legendary_fish))
+        legendary_text = ", ".join(unique_legendary[:5])  # Pokaż max 5
+        if len(unique_legendary) > 5:
+            legendary_text += f" i {len(unique_legendary) - 5} więcej..."
+        embed.add_field(name="🌟 Legendarne złowione", value=legendary_text, inline=False)
+    
+    embed.set_thumbnail(url=target_user.display_avatar.url)
+    embed.set_footer(text=f"Pierwsza ryba złowiona: {catches[0]['timestamp']}")
+    
+    await interaction.response.send_message(embed=embed)
+
 if __name__ == "__main__":
     if not TOKEN:
         print("❌ Błąd: Nie znaleziono DISCORD_TOKEN w pliku .env")
         print("Utwórz plik .env i dodaj: DISCORD_TOKEN=twoj_token_tutaj")
     else:
+        load_catches()  # Wczytaj zapisane złowione ryby
         bot.run(TOKEN)
