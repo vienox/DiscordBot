@@ -415,6 +415,36 @@
       "rarity": "Pospolity",
       "chance": 14.6,
       "timestamp": "2025-12-26 20:30:44"
+    },
+    {
+      "fish": "🐟 Węgorz",
+      "rarity": "Pospolity",
+      "chance": 14.5,
+      "timestamp": "2025-12-26 20:30:53"
+    },
+    {
+      "fish": "🐟 Wzdręga",
+      "rarity": "Pospolity",
+      "chance": 13.4,
+      "timestamp": "2025-12-26 20:31:01"
+    },
+    {
+      "fish": "🐟 Śliz",
+      "rarity": "Pospolity",
+      "chance": 12.8,
+      "timestamp": "2025-12-26 20:31:09"
+    },
+    {
+      "fish": "🐟 Sola",
+      "rarity": "Pospolity",
+      "chance": 7.6,
+      "timestamp": "2025-12-26 20:31:19"
+    },
+    {
+      "fish": "🐟 Strzebla",
+      "rarity": "Pospolity",
+      "chance": 7.1,
+      "timestamp": "2025-12-26 20:31:29"
     }
   ],
   "500368740446371860": [
@@ -723,6 +753,42 @@
       "rarity": "Rzadki",
       "chance": 3.2,
       "timestamp": "2025-12-26 20:30:31"
+    },
+    {
+      "fish": "🐟 Koza",
+      "rarity": "Pospolity",
+      "chance": 14.6,
+      "timestamp": "2025-12-26 20:30:45"
+    },
+    {
+      "fish": "🐟 Piekielnica",
+      "rarity": "Pospolity",
+      "chance": 12.2,
+      "timestamp": "2025-12-26 20:30:53"
+    },
+    {
+      "fish": "🦀 Krab",
+      "rarity": "Pospolity",
+      "chance": 12.5,
+      "timestamp": "2025-12-26 20:31:04"
+    },
+    {
+      "fish": "🐟 Maślanka",
+      "rarity": "Pospolity",
+      "chance": 9.2,
+      "timestamp": "2025-12-26 20:31:14"
+    },
+    {
+      "fish": "🦀 Krab",
+      "rarity": "Pospolity",
+      "chance": 12.5,
+      "timestamp": "2025-12-26 20:31:21"
+    },
+    {
+      "fish": "🐟 Sumik",
+      "rarity": "Pospolity",
+      "chance": 7.3,
+      "timestamp": "2025-12-26 20:31:34"
     }
   ]
 }

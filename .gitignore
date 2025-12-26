@@ -87,6 +87,7 @@ logs/
 downloads/
 temp/
 cache/
+.cache/
 cookies.txt
 
 # FFmpeg
