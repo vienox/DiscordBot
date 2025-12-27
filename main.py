@@ -570,16 +570,18 @@ async def play(interaction: discord.Interaction, zapytanie: str):
                 return
                 
         elif playlist_match:
+            playlist_type = playlist_match.group(1)  # 'playlist' lub 'album'
             playlist_id = playlist_match.group(2)
-            print(f"DEBUG: Wykryto Spotify playlist/album, ID: {playlist_id}")
-            await interaction.followup.send("📥 Pobieram playlistę Spotify...")
+            type_pl = "album" if playlist_type == "album" else "playlistę"
+            print(f"DEBUG: Wykryto Spotify {playlist_type}, ID: {playlist_id}")
+            await interaction.followup.send(f"📥 Pobieram {type_pl} Spotify...")
             
             tracks = await get_spotify_playlist_info(playlist_id)
             if tracks:
                 search_queries = tracks
                 await interaction.followup.send(f"✅ Znaleziono {len(tracks)} utworów ze Spotify")
             else:
-                await interaction.followup.send("❌ Nie udało się pobrać playlisty Spotify")
+                await interaction.followup.send(f"❌ Nie udało się pobrać {type_pl} Spotify")
                 return
         else:
             search_queries = [zapytanie]
@@ -927,9 +929,10 @@ def select_random_fish():
     for fish_name, fish_data in FISH_SPECIES.items():
         current += fish_data["chance"]
         if rand <= current:
-            return fish_name, fish_data
+            return fish_name, fish_data, total_chance
     
-    return list(FISH_SPECIES.items())[-1]
+    last_fish = list(FISH_SPECIES.items())[-1]
+    return last_fish[0], last_fish[1], total_chance
 
 @bot.tree.command(name="lowrybe", description="Rzuć wędkę i złap rybę!")
 async def lowrybe(interaction: discord.Interaction):
@@ -954,7 +957,10 @@ async def lowrybe(interaction: discord.Interaction):
     await asyncio.sleep(wait_time)
     
     # Losuj rybę
-    fish_name, fish_data = select_random_fish()
+    fish_name, fish_data, total_chance = select_random_fish()
+    
+    # Oblicz prawdziwą szansę w procentach
+    real_chance = (fish_data["chance"] / total_chance) * 100
     
     # Zapisz złowioną rybę
     user_id_str = str(user_id)
@@ -977,7 +983,7 @@ async def lowrybe(interaction: discord.Interaction):
         color=fish_data["color"]
     )
     result_embed.add_field(name="Rzadkość", value=fish_data["rarity"], inline=True)
-    result_embed.add_field(name="Szansa", value=f"{fish_data['chance']}%", inline=True)
+    result_embed.add_field(name="Szansa", value=f"{real_chance:.4f}%", inline=True)
     result_embed.add_field(name="Czas łowienia", value=f"{wait_time} sekund", inline=True)
     result_embed.add_field(name="Łącznie złowionych", value=f"{len(user_catches[user_id_str])} ryb", inline=False)
     
@@ -1003,7 +1009,6 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
     catches = user_catches[user_id_str]
     total_catches = len(catches)
     
-    # Zlicz ryby według rzadkości
     rarity_counts = {
         "Legendarny": 0,
         "Epicki": 0,
@@ -1011,7 +1016,6 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
         "Pospolity": 0
     }
     
-    # Zlicz każdy gatunek
     fish_counts = {}
     for catch in catches:
         fish_name = catch["fish"]
@@ -1019,7 +1023,6 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
         rarity_counts[rarity] += 1
         fish_counts[fish_name] = fish_counts.get(fish_name, 0) + 1
     
-    # Stwórz embed z statystykami
     embed = discord.Embed(
         title=f"🎣 Złowione ryby - {target_user.display_name}",
         description=f"Łącznie złowionych: **{total_catches}** ryb",
@@ -1055,6 +1058,62 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
     
     embed.set_thumbnail(url=target_user.display_avatar.url)
     embed.set_footer(text=f"Pierwsza ryba złowiona: {catches[0]['timestamp']}")
+    
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="ranking", description="Ranking złowionych ryb według rzadkości")
+async def ranking(interaction: discord.Interaction):
+    if not user_catches:
+        await interaction.response.send_message("🎣 Nikt jeszcze nie złowił żadnej ryby!", ephemeral=True)
+        return
+    
+    user_stats = {}
+    for user_id_str, catches in user_catches.items():
+        user_id = int(user_id_str)
+        user = await bot.fetch_user(user_id)
+        
+        rarity_scores = {
+            "Legendarny": 0,
+            "Epicki": 0,
+            "Rzadki": 0,
+            "Pospolity": 0
+        }
+        
+        for catch in catches:
+            rarity = catch["rarity"]
+            rarity_scores[rarity] += 1
+        
+        user_stats[user] = {
+            "legendarny": rarity_scores["Legendarny"],
+            "epicki": rarity_scores["Epicki"],
+            "rzadki": rarity_scores["Rzadki"],
+            "pospolity": rarity_scores["Pospolity"],
+            "total": len(catches)
+        }
+    
+    sorted_users = sorted(
+        user_stats.items(),
+        key=lambda x: (x[1]["legendarny"], x[1]["epicki"], x[1]["rzadki"], x[1]["pospolity"]),
+        reverse=True
+    )
+    
+    embed = discord.Embed(
+        title="🏆 Ranking Wędkarzy",
+        description="Ranking według rzadkości złowionych ryb",
+        color=0xFFD700
+    )
+    
+    ranking_text = ""
+    for i, (user, stats) in enumerate(sorted_users[:10], 1):
+        medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+        ranking_text += (
+            f"{medal} **{user.display_name}**\n"
+            f"   🔴 {stats['legendarny']} | 🟣 {stats['epicki']} | "
+            f"🔵 {stats['rzadki']} | 🟢 {stats['pospolity']}\n"
+        )
+    
+    embed.add_field(name="Top 10 Wędkarzy", value=ranking_text, inline=False)
+    embed.set_footer(text="🔴 Legendarny | 🟣 Epicki | 🔵 Rzadki | 🟢 Pospolity")
     
     await interaction.response.send_message(embed=embed)
 
