@@ -17,6 +17,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import json
 from datetime import datetime
+from fish_data import FISH_SPECIES
 
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 env_values = dotenv_values(env_path)
@@ -917,118 +918,6 @@ def save_catches():
     except Exception as e:
         print(f"Błąd zapisywania złowionych ryb: {e}")
 
-FISH_SPECIES = {
-    # Bardzo rzadkie (0.01% - 0.5%)
-    "🦈 Rekin Biały": {"chance": 0.01, "rarity": "Legendarny", "color": 0xFF0000},
-    "🐋 Wieloryb": {"chance": 0.02, "rarity": "Legendarny", "color": 0xFF0000},
-    "🦑 Kolosalny Kalmar": {"chance": 0.05, "rarity": "Legendarny", "color": 0xFF0000},
-    "🐉 Smok Morski": {"chance": 0.03, "rarity": "Legendarny", "color": 0xFF0000},
-    "🦈 Rekin Tygrysí": {"chance": 0.08, "rarity": "Legendarny", "color": 0xFF0000},
-    "🐠 Ryba Smok": {"chance": 0.1, "rarity": "Legendarny", "color": 0xFF0000},
-    "🦈 Rekin Młot": {"chance": 0.15, "rarity": "Legendarny", "color": 0xFF0000},
-    "🐡 Ryba Balon Olbrzym": {"chance": 0.2, "rarity": "Legendarny", "color": 0xFF0000},
-    "🐙 Ośmiornica Olbrzymia": {"chance": 0.25, "rarity": "Legendarny", "color": 0xFF0000},
-    "🦞 Homar Królewski": {"chance": 0.3, "rarity": "Legendarny", "color": 0xFF0000},
-    
-    # Rzadkie (0.5% - 2%)
-    "🐠 Ryba Anioł Cesarska": {"chance": 0.5, "rarity": "Epicki", "color": 0x9B59B6},
-    "🐡 Puffer Cesarski": {"chance": 0.6, "rarity": "Epicki", "color": 0x9B59B6},
-    "🦈 Rekin Szary": {"chance": 0.7, "rarity": "Epicki", "color": 0x9B59B6},
-    "🐠 Napoleonka": {"chance": 0.8, "rarity": "Epicki", "color": 0x9B59B6},
-    "🦐 Krewetka Mantis": {"chance": 0.9, "rarity": "Epicki", "color": 0x9B59B6},
-    "🐟 Tuńczyk Błękitnopłetwy": {"chance": 1.0, "rarity": "Epicki", "color": 0x9B59B6},
-    "🐠 Skalary Olbrzymie": {"chance": 1.2, "rarity": "Epicki", "color": 0x9B59B6},
-    "🐡 Ryba Jeż": {"chance": 1.4, "rarity": "Epicki", "color": 0x9B59B6},
-    "🦀 Krab Olbrzymi": {"chance": 1.6, "rarity": "Epicki", "color": 0x9B59B6},
-    "🐙 Ośmiornica Kolca": {"chance": 1.8, "rarity": "Epicki", "color": 0x9B59B6},
-    
-    # Nieczęste (2% - 5%)
-    "🐟 Łosoś Królewski": {"chance": 2.0, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐠 Ryba Papuga": {"chance": 2.2, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐟 Pstrąg Tęczowy": {"chance": 2.5, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐡 Ryba Balon": {"chance": 2.8, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐠 Ryba Motyl": {"chance": 3.0, "rarity": "Rzadki", "color": 0x3498DB},
-    "🦞 Homar": {"chance": 3.2, "rarity": "Rzadki", "color": 0x3498DB},
-    "🦀 Krab Błękitny": {"chance": 3.5, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐟 Sum": {"chance": 3.8, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐠 Ryba Chirurg": {"chance": 4.0, "rarity": "Rzadki", "color": 0x3498DB},
-    "🐟 Śledź Królewski": {"chance": 4.5, "rarity": "Rzadki", "color": 0x3498DB},
-    
-    # Pospolite (5% - 15%)
-    "🐟 Karaś": {"chance": 5.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Leszcz": {"chance": 5.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Płoć": {"chance": 6.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐠 Konik Morski": {"chance": 6.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Okoń": {"chance": 7.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Sandacz": {"chance": 7.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Szczupak": {"chance": 8.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐡 Ryba Kula": {"chance": 8.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐠 Ryba Klown": {"chance": 9.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Makrela": {"chance": 9.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Sardynka": {"chance": 10.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Śledź": {"chance": 10.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Dorsz": {"chance": 11.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🦐 Krewetka": {"chance": 11.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🦞 Rak": {"chance": 12.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🦀 Krab": {"chance": 12.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐚 Małż": {"chance": 13.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Lin": {"chance": 13.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Karp": {"chance": 14.0, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Węgorz": {"chance": 14.5, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Amur": {"chance": 5.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Tołpyga": {"chance": 5.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Jazgarz": {"chance": 5.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Stynka": {"chance": 5.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Ukleja": {"chance": 6.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Jelec": {"chance": 6.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Kleń": {"chance": 6.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Miętus": {"chance": 6.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Płastuga": {"chance": 7.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Flądra": {"chance": 7.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Sola": {"chance": 7.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Turbot": {"chance": 7.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Halibut": {"chance": 8.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Morfil": {"chance": 8.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Mintaj": {"chance": 8.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Łupacz": {"chance": 8.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Maślanka": {"chance": 9.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Szprot": {"chance": 9.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Stornia": {"chance": 9.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Belona": {"chance": 9.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Boleń": {"chance": 10.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Brzana": {"chance": 10.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Certa": {"chance": 10.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Czebaczek": {"chance": 10.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Kiełb": {"chance": 11.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Krąp": {"chance": 11.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Lipień": {"chance": 11.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Minog": {"chance": 11.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Piekielnica": {"chance": 12.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Różanka": {"chance": 12.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Słonecznica": {"chance": 12.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Śliz": {"chance": 12.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Świnka": {"chance": 13.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Wzdręga": {"chance": 13.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Zbiornik": {"chance": 13.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Amur Biały": {"chance": 13.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Babka": {"chance": 14.2, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Ciosa": {"chance": 14.4, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Koza": {"chance": 14.6, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Miętus Morski": {"chance": 14.8, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Murena": {"chance": 5.3, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Palia": {"chance": 5.7, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Plamiak": {"chance": 6.1, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Rogacz": {"chance": 6.3, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Sielawa": {"chance": 6.7, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Sieja": {"chance": 6.9, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Strzebla": {"chance": 7.1, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Sumik": {"chance": 7.3, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Troć": {"chance": 7.7, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Wąsacz": {"chance": 7.9, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Witlinek": {"chance": 8.1, "rarity": "Pospolity", "color": 0x2ECC71},
-    "🐟 Zimnica": {"chance": 8.3, "rarity": "Pospolity", "color": 0x2ECC71},
-}
-
 def select_random_fish():
     """Losuje rybę na podstawie szans"""
     total_chance = sum(fish["chance"] for fish in FISH_SPECIES.values())
@@ -1137,7 +1026,6 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
         color=0x3498DB
     )
     
-    # Dodaj statystyki rzadkości
     rarity_text = (
         f"🔴 Legendarnych: **{rarity_counts['Legendarny']}**\n"
         f"🟣 Epickich: **{rarity_counts['Epicki']}**\n"
@@ -1146,24 +1034,21 @@ async def zlowione(interaction: discord.Interaction, user: discord.User = None):
     )
     embed.add_field(name="📊 Statystyki rzadkości", value=rarity_text, inline=False)
     
-    # Sortuj ryby od najrzadszych do najpospolitszych
     rarity_order = {"Legendarny": 0, "Epicki": 1, "Rzadki": 2, "Pospolity": 3}
     sorted_catches = sorted(catches, key=lambda x: rarity_order.get(x["rarity"], 4))
     
-    # Pokaż 10 najrzadszych złowionych ryb
-    rare_catches = sorted_catches[:10]  # Pierwsze 10 (najrzadsze)
+    rare_catches = sorted_catches[:10] 
     rare_text = ""
     for i, catch in enumerate(rare_catches, 1):
         rare_text += f"{i}. {catch['fish']} - *{catch['rarity']}* ({catch['timestamp']})\n"
     
     if rare_text:
-        embed.add_field(name="🌟 Najrzadsze złowione (max 10)", value=rare_text, inline=False)
+        embed.add_field(name="🌟 Najrzadsze złowione", value=rare_text, inline=False)
     
-    # Pokaż najrzadsze złowione ryby
     legendary_fish = [c["fish"] for c in catches if c["rarity"] == "Legendarny"]
     if legendary_fish:
         unique_legendary = list(set(legendary_fish))
-        legendary_text = ", ".join(unique_legendary[:5])  # Pokaż max 5
+        legendary_text = ", ".join(unique_legendary[:5]) 
         if len(unique_legendary) > 5:
             legendary_text += f" i {len(unique_legendary) - 5} więcej..."
         embed.add_field(name="🌟 Legendarne złowione", value=legendary_text, inline=False)
@@ -1178,5 +1063,5 @@ if __name__ == "__main__":
         print("❌ Błąd: Nie znaleziono DISCORD_TOKEN w pliku .env")
         print("Utwórz plik .env i dodaj: DISCORD_TOKEN=twoj_token_tutaj")
     else:
-        load_catches()  # Wczytaj zapisane złowione ryby
+        load_catches()  
         bot.run(TOKEN)
