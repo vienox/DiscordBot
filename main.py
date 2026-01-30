@@ -17,6 +17,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import json
 from datetime import datetime
+import sys
 from fish_data import FISH_SPECIES
 
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -85,9 +86,34 @@ if USE_COOKIES:
     YDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn -b:a 320k -ar 48000 -ac 2'
+    'before_options': (
+        '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 '
+        '-reconnect_at_eof 1 -reconnect_on_network_error 1'
+    ),
+    'options': '-vn'
 }
+
+def build_ffmpeg_options(info):
+    before_options = FFMPEG_OPTIONS.get('before_options', '').strip()
+    options = FFMPEG_OPTIONS.get('options', '').strip()
+
+    headers = info.get('http_headers') or {}
+    if headers:
+        header_lines = ''.join(f'{k}: {v}\r\n' for k, v in headers.items())
+        header_lines = header_lines.replace('"', '\\"')
+        if before_options:
+            before_options = f'{before_options} -headers "{header_lines}"'
+        else:
+            before_options = f'-headers "{header_lines}"'
+        user_agent = headers.get('User-Agent')
+        if user_agent:
+            user_agent = user_agent.replace('"', '\\"')
+            before_options = f'{before_options} -user_agent "{user_agent}"'
+
+    return {
+        'before_options': before_options,
+        'options': options
+    }
 
 music_queues = {}
 giveaways = {}
@@ -354,7 +380,11 @@ async def get_spotify_playlist_info(playlist_id):
 async def play_next(guild, text_channel=None):
     queue = get_queue(guild.id)
     voice_client = discord.utils.get(bot.voice_clients, guild=guild)
-    
+    try:
+        vc_connected = voice_client.is_connected() if voice_client else False
+    except Exception:
+        vc_connected = False
+    print(f"DEBUG play_next: guild={getattr(guild, 'id', None)} voice_client={voice_client} connected={vc_connected} queue_len={len(queue.queue)}")
     if not text_channel and hasattr(bot, 'text_channels'):
         text_channel = bot.text_channels.get(guild.id)
     
@@ -364,6 +394,7 @@ async def play_next(guild, text_channel=None):
             try:
                 with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
                     info = ydl.extract_info(song['url'], download=False)
+                    print(f"DEBUG yt_dlp info keys: {list(info.keys()) if isinstance(info, dict) else type(info)}")
                     
                     age_limit = info.get('age_limit', 0)
                     if age_limit >= 18:
@@ -379,7 +410,8 @@ async def play_next(guild, text_channel=None):
                         await play_next(guild, text_channel)
                         return
                     
-                    url = info['url']
+                    url = info.get('url') or info.get('webpage_url') or song.get('url')
+                    print(f"DEBUG playing url: {url} (title={song.get('title')})")
                     
                 def after_playing(error):
                     if error:
@@ -388,10 +420,20 @@ async def play_next(guild, text_channel=None):
                         play_next(guild, text_channel), bot.loop
                     )
                 
-                voice_client.play(
-                    discord.FFmpegPCMAudio(url, executable=FFMPEG_PATH, **FFMPEG_OPTIONS),
-                    after=after_playing
-                )
+                try:
+                    ffmpeg_opts = build_ffmpeg_options(info)
+                    voice_client.play(
+                        discord.FFmpegPCMAudio(
+                            url,
+                            executable=FFMPEG_PATH,
+                            stderr=sys.stderr,
+                            **ffmpeg_opts
+                        ),
+                        after=after_playing
+                    )
+                except Exception as play_err:
+                    print(f"ERROR podczas odtwarzania: {play_err}")
+                    raise
 
                 if text_channel:
                     try:

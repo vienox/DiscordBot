@@ -18,12 +18,19 @@ if exist ".venv\Scripts\activate.bat" (
 )
 
 echo.
+
 echo [INFO] Uruchamianie bota...
 echo [INFO] Nacisnij Ctrl+C aby zatrzymac bota
 echo ====================================
 echo.
 
-python main.py
+if exist ".venv\Scripts\python.exe" (
+    echo [INFO] Uruchamiam Python z .venv
+    .venv\Scripts\python.exe main.py
+) else (
+    echo [INFO] Uruchamiam systemowy Python
+    python main.py
+)
 
 if errorlevel 1 (
     echo.
