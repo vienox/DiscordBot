@@ -498,7 +498,8 @@ async def help_command(interaction: discord.Interaction):
             value=(
                 "`/join` - Bot dołącza do kanału głosowego\n"
                 "`/leave` - Bot opuszcza kanał głosowy\n"
-                "`/help` - Pokaż tę wiadomość"
+                "`/help` - Pokaż tę wiadomość\n"
+                "`/ping` - Sprawdź opóźnienie bota"
             ),
             inline=False
         )
@@ -541,6 +542,14 @@ async def help_command(interaction: discord.Interaction):
         embed.set_footer(text="Bot stworzony z ❤️ | Obsługuje YouTube i Spotify")
         
         await interaction.response.send_message(embed=embed)
+    except discord.errors.NotFound:
+        pass
+
+@bot.tree.command(name="ping", description="Sprawdź opóźnienie bota")
+async def ping(interaction: discord.Interaction):
+    try:
+        latency_ms = round(bot.latency * 1000)
+        await interaction.response.send_message(f"🏓 Pong! Opóźnienie: {latency_ms} ms")
     except discord.errors.NotFound:
         pass
 
